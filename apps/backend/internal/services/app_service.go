@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 
@@ -164,6 +165,12 @@ func (s *AppService) Update(ctx context.Context, caller Caller, id string, in Cr
 	if err != nil {
 		return nil, err
 	}
+	// The panel exposure is a published_app row, so it must not be editable
+	// through the generic app API: that path skips the loopback check and would
+	// let the control plane point at itself.
+	if app.Kind == "panel" {
+		return nil, Forbidden("the panel exposure is managed from Settings, not from the app list")
+	}
 	tunnel, err := s.tunnels.FindByID(ctx, app.TunnelID)
 	if err != nil {
 		return nil, err
@@ -274,6 +281,11 @@ func (s *AppService) SetEnabled(ctx context.Context, caller Caller, id string, e
 	app, err := s.Get(ctx, caller, id)
 	if err != nil {
 		return nil, err
+	}
+	// Disabling the panel row here would drop it from the tunnel's ingress while
+	// Settings still reports the panel as published. Settings owns that state.
+	if app.Kind == "panel" {
+		return nil, Forbidden("the panel exposure is managed from Settings, not from the app list")
 	}
 	tunnel, err := s.tunnels.FindByID(ctx, app.TunnelID)
 	if err != nil {
@@ -394,12 +406,70 @@ func checkNoLoop(serviceURL string, in PanelExposureInput, publicURL string) err
 			"service_url": "points at the hostname being published; use the panel's own reachable address instead",
 		})
 	}
-	if pub, err := url.Parse(publicURL); err == nil && pub.Hostname() != "" && strings.EqualFold(target, pub.Hostname()) {
-		return Validation(map[string]string{
-			"service_url": "points at PUBLIC_URL, which is this same panel; a remote connector cannot reach it that way",
-		})
+	// An IP literal can never be a Cloudflare hostname, so pointing a remote
+	// connector at the panel's own LAN address is legitimate even when
+	// PUBLIC_URL uses that same IP (the normal single-host install). Only a DNS
+	// name can loop back through the tunnel.
+	if net.ParseIP(target) == nil {
+		if pub, err := url.Parse(publicURL); err == nil && pub.Hostname() != "" && strings.EqualFold(target, pub.Hostname()) {
+			return Validation(map[string]string{
+				"service_url": "points at PUBLIC_URL, which is this same panel; a remote connector cannot reach it that way",
+			})
+		}
 	}
 	return nil
+}
+
+// remotePanelServiceURL is the address a connector on another device can use to
+// reach this panel, derived from PUBLIC_URL. It returns "" when PUBLIC_URL is a
+// DNS name, because that name is served by the tunnel itself and would loop.
+func remotePanelServiceURL(publicURL string) string {
+	u, err := url.Parse(strings.TrimSpace(publicURL))
+	if err != nil || u.Host == "" || net.ParseIP(u.Hostname()) == nil {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
+}
+
+// PanelAddress is what the Settings page needs to fill the exposure form
+// without asking the operator for the panel's own origin.
+type PanelAddress struct {
+	PublicURL   string `json:"public_url"`
+	InternalURL string `json:"internal_url"`
+	// RemoteServiceURL is empty when PUBLIC_URL is a hostname.
+	RemoteServiceURL string `json:"remote_service_url"`
+}
+
+func (s *AppService) PanelAddress() PanelAddress {
+	return PanelAddress{
+		PublicURL:        s.cfg.PublicURL,
+		InternalURL:      s.cfg.PanelInternalURL,
+		RemoteServiceURL: remotePanelServiceURL(s.cfg.PublicURL),
+	}
+}
+
+// resolvePanelServiceURL picks the origin the connector must proxy to. A local
+// connector reaches the panel over the Docker network. A connector on another
+// device cannot, so it needs the panel host's LAN/VPN address: the operator's
+// explicit value, or PUBLIC_URL when that is already an IP.
+func resolvePanelServiceURL(in PanelExposureInput, tunnelLocation, publicURL, internalURL string) (string, error) {
+	if tunnelLocation != "remote" {
+		return internalURL, nil
+	}
+	serviceURL := strings.TrimSpace(in.ServiceURL)
+	if serviceURL == "" {
+		serviceURL = remotePanelServiceURL(publicURL)
+	}
+	if serviceURL == "" {
+		return "", Validation(map[string]string{
+			"service_url": "required for a tunnel on another device: enter the panel host's LAN/VPN address " +
+				"(PUBLIC_URL is a hostname, so it cannot be reused here)",
+		})
+	}
+	if err := checkNoLoop(serviceURL, in, publicURL); err != nil {
+		return "", err
+	}
+	return serviceURL, nil
 }
 
 func (s *AppService) GetPanelExposure(ctx context.Context) (*models.PublishedApp, error) {
@@ -436,24 +506,21 @@ func (s *AppService) SetPanelExposure(ctx context.Context, caller Caller, in Pan
 	// reaches the panel over the Docker network. A connector on another device
 	// can only reach it over the network — and must NOT be handed the public
 	// hostname being created here, or every request would loop back into the
-	// tunnel. So remote exposure requires an explicit, loopback-free URL.
-	var serviceURL string
-	if tunnel.Location == "remote" {
-		serviceURL = strings.TrimSpace(in.ServiceURL)
-		if serviceURL == "" {
-			return nil, Validation(map[string]string{
-				"service_url": "required for a tunnel on another device, e.g. http://192.168.1.10:7777 " +
-					"(it must not be the hostname you are publishing)",
-			})
-		}
-		if err := checkNoLoop(serviceURL, in, s.cfg.PublicURL); err != nil {
-			return nil, err
-		}
-	} else {
-		serviceURL = s.cfg.PanelInternalURL
+	// tunnel. So remote exposure requires a loopback-free address, defaulting to
+	// PUBLIC_URL when that is already an IP.
+	serviceURL, err := resolvePanelServiceURL(in, tunnel.Location, s.cfg.PublicURL, s.cfg.PanelInternalURL)
+	if err != nil {
+		return nil, err
 	}
 	hostname, err := resolveHostname(CreateAppInput{Hostname: in.Hostname, Subdomain: in.Subdomain, Domain: in.Domain})
 	if err != nil {
+		return nil, err
+	}
+	// A hostname is globally unique: an app claimed by another tunnel must not
+	// be taken over silently. The panel's own existing row is the only exception.
+	if other, err := s.apps.FindByHostname(ctx, hostname); err == nil && other != nil && other.Kind != "panel" {
+		return nil, Conflict("hostname " + hostname + " is already published by another app")
+	} else if err != nil && !errors.Is(err, db.ErrNotFound) {
 		return nil, err
 	}
 	account, err := s.accounts.FindByID(ctx, tunnel.CFAccountID)
@@ -476,6 +543,7 @@ func (s *AppService) SetPanelExposure(ctx context.Context, caller Caller, in Pan
 		}
 		existing.TunnelID = tunnel.ID
 		existing.OwnerID = caller.ID
+		existing.Kind = "panel"
 		existing.Hostname = hostname
 		existing.Path = "/*"
 		existing.ServiceURL = serviceURL

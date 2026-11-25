@@ -193,6 +193,18 @@ func (s *TunnelService) Delete(ctx context.Context, caller Caller, id string) er
 		return err
 	}
 
+	// Deleting the tunnel cascades to its published_app rows. If one of them is
+	// the panel exposure, that would silently unpublish the control plane and
+	// leave its DNS record pointing at a tunnel that no longer exists. Make the
+	// operator move or remove the exposure first.
+	if apps, err := s.apps.ListByTunnel(ctx, tunnel.ID); err == nil {
+		for _, app := range apps {
+			if app.Kind == "panel" {
+				return Conflict("this tunnel publishes the panel itself; move or remove the panel exposure in Settings before deleting it")
+			}
+		}
+	}
+
 	_ = s.conn.Stop(ctx, tunnel)
 	_ = s.conn.Remove(ctx, tunnel)
 

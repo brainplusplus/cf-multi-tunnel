@@ -86,6 +86,13 @@ export interface PublishedApp {
   created_at: string;
 }
 
+export interface PanelAddress {
+  public_url: string;
+  internal_url: string;
+  /** Empty when PUBLIC_URL is a DNS name, which would loop through the tunnel. */
+  remote_service_url: string;
+}
+
 export interface DashboardStats {
   accounts: number;
   tunnels: number;

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ArrowUpCircle, CheckCircle2, Container, Globe2, RefreshCw, Trash2 } from 'lucide-react';
 import { apiMessage } from '../api/client';
-import { connectorApi, panelApi, tunnelsApi } from '../api/endpoints';
+import { accountsApi, connectorApi, panelApi, tunnelsApi } from '../api/endpoints';
 import { Badge, ErrorBox, Field, PageHeader, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
-import type { ConnectorStatus, PublishedApp, RemoteTag, Tunnel } from '../types';
+import type { CFAccount, CFZone, ConnectorStatus, PanelAddress, PublishedApp, RemoteTag, Tunnel } from '../types';
 
 export default function SettingsPage() {
   return (
@@ -18,26 +18,49 @@ export default function SettingsPage() {
 
 function PanelExposureCard() {
   const toast = useToast();
+  const [accounts, setAccounts] = useState<CFAccount[]>([]);
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
+  const [zones, setZones] = useState<CFZone[]>([]);
+  const [address, setAddress] = useState<PanelAddress | null>(null);
   const [exposure, setExposure] = useState<PublishedApp | null>(null);
+  const [accountFilter, setAccountFilter] = useState('');
   const [tunnelId, setTunnelId] = useState('');
-  const [hostname, setHostname] = useState('');
+  const [subdomain, setSubdomain] = useState('');
+  const [domain, setDomain] = useState('');
   const [serviceUrl, setServiceUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     try {
-      const [tuns, exp] = await Promise.all([tunnelsApi.list(), panelApi.get()]);
+      const [accs, tuns, exp, addr] = await Promise.all([
+        accountsApi.list(),
+        tunnelsApi.list(),
+        panelApi.get(),
+        panelApi.address(),
+      ]);
+      setAccounts(accs);
       setTunnels(tuns);
       setExposure(exp);
+      setAddress(addr);
+      setTunnelId(exp?.tunnel_id ?? tuns.find((t) => t.config_src === 'cloudflare')?.id ?? '');
       if (exp) {
-        setTunnelId(exp.tunnel_id);
-        setHostname(exp.hostname);
+        // zone_name is the zone the panel resolved when the exposure was
+        // created, so it is always the right split point.
+        const zoneName = exp.zone_name;
+        setDomain(zoneName);
+        setSubdomain(
+          zoneName && exp.hostname.endsWith(`.${zoneName}`)
+            ? exp.hostname.slice(0, -(zoneName.length + 1))
+            : exp.hostname,
+        );
         setServiceUrl(exp.service_url);
-      } else if (tuns.length > 0) {
-        setTunnelId(tuns[0].id);
+      } else {
+        setSubdomain('');
+        setDomain('');
+        setServiceUrl(addr.remote_service_url);
       }
+      setError('');
     } catch (err) {
       setError(apiMessage(err));
     }
@@ -47,9 +70,48 @@ function PanelExposureCard() {
     void load();
   }, [load]);
 
-  const publishable = tunnels.filter((t) => t.config_src === 'cloudflare');
   const selectedTunnel = tunnels.find((t) => t.id === tunnelId);
+  const tunnelAccountId = selectedTunnel?.cf_account_id ?? '';
   const isRemote = selectedTunnel?.location === 'remote';
+
+  // Zones follow the tunnel's account. Only tunnels with API access can carry
+  // the panel, and their account is the one whose zones matter.
+  useEffect(() => {
+    let cancelled = false;
+    if (!tunnelAccountId) {
+      setZones([]);
+      return;
+    }
+    accountsApi
+      .zones(tunnelAccountId)
+      .then((zs) => {
+        if (!cancelled) setZones(zs);
+      })
+      .catch(() => {
+        if (!cancelled) setZones([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tunnelAccountId]);
+
+  useEffect(() => {
+    if (zones.length > 0 && !domain) setDomain(zones[0].name);
+  }, [zones, domain]);
+
+  const publishable = tunnels.filter(
+    (t) => t.config_src === 'cloudflare' && (!accountFilter || t.cf_account_id === accountFilter),
+  );
+  const effectiveServiceUrl = isRemote ? serviceUrl : (address?.internal_url ?? '');
+
+  const onTunnelChange = (id: string) => {
+    setTunnelId(id);
+    // Clear the zone list and domain: they belong to the previous account's
+    // zones. The effects above repopulate from the new tunnel's account.
+    setZones([]);
+    setDomain('');
+    setServiceUrl(address?.remote_service_url ?? '');
+  };
 
   const save = async () => {
     setBusy(true);
@@ -57,8 +119,9 @@ function PanelExposureCard() {
     try {
       const app = await panelApi.set({
         tunnel_id: tunnelId,
-        hostname,
-        ...(isRemote ? { service_url: serviceUrl } : {}),
+        subdomain: subdomain.trim(),
+        domain,
+        ...(isRemote ? { service_url: serviceUrl.trim() } : {}),
       });
       toast.push(app.sync_status === 'synced' ? 'success' : 'info', app.last_error || 'Panel exposure saved');
       await load();
@@ -76,7 +139,7 @@ function PanelExposureCard() {
       await panelApi.remove();
       toast.push('success', 'Panel exposure removed');
       setExposure(null);
-      setHostname('');
+      setSubdomain('');
       await load();
     } catch (err) {
       setError(apiMessage(err));
@@ -114,8 +177,18 @@ function PanelExposureCard() {
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Tunnel" hint="Only tunnels with remote configuration can carry the panel.">
-          <select className="field" value={tunnelId} onChange={(e) => setTunnelId(e.target.value)}>
+        <Field label="Account" hint="Optional filter. The panel can only be published through a tunnel with an API token.">
+          <select className="field" value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}>
+            <option value="">All accounts</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Tunnel" error={publishable.length === 0 ? 'No tunnel with an API token yet.' : undefined}>
+          <select className="field" value={tunnelId} onChange={(e) => onTunnelChange(e.target.value)}>
             <option value="">Select a tunnel</option>
             {publishable.map((t) => (
               <option key={t.id} value={t.id}>
@@ -124,16 +197,47 @@ function PanelExposureCard() {
             ))}
           </select>
         </Field>
-        <Field label="Hostname" hint="e.g. panel.example.com — the zone must be cached for that account.">
-          <input className="field" value={hostname} onChange={(e) => setHostname(e.target.value)} placeholder="panel.example.com" />
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1.4fr]">
+        <Field label="Subdomain">
+          <input
+            className="field"
+            value={subdomain}
+            onChange={(e) => setSubdomain(e.target.value)}
+            placeholder="panel"
+            autoComplete="off"
+          />
+        </Field>
+        <Field
+          label="Domain"
+          hint={zones.length === 0 ? 'No zone cached for this account; sync zones in Accounts first.' : undefined}
+        >
+          {zones.length > 0 && zones.some((z) => z.name === domain) ? (
+            <select className="field" value={domain} onChange={(e) => setDomain(e.target.value)}>
+              {zones.map((z) => (
+                <option key={z.id} value={z.name}>
+                  {z.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className="field"
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              placeholder="example.com"
+              autoComplete="off"
+            />
+          )}
         </Field>
       </div>
 
-      {isRemote && (
-        <div className="mt-3">
+      <div className="mt-3">
+        {isRemote ? (
           <Field
             label="Panel address reachable from that device"
-            hint="The remote connector proxies to this URL. Use the panel host's LAN/VPN address, not the hostname you are publishing."
+            hint="Filled in automatically from PUBLIC_URL. Change it only if that device reaches the panel another way."
           >
             <input
               className="field font-mono text-xs"
@@ -142,18 +246,35 @@ function PanelExposureCard() {
               placeholder="http://192.168.1.10:7777"
             />
           </Field>
-        </div>
+        ) : (
+          <Field
+            label="Service URL"
+            hint="Set automatically: the connector container reaches the panel on the Docker network."
+          >
+            <input className="field font-mono text-xs" value={effectiveServiceUrl} readOnly disabled />
+          </Field>
+        )}
+      </div>
+
+      {subdomain && domain && (
+        <p className="mt-3 text-xs text-slate-500">
+          Will be published as{' '}
+          <span className="font-mono text-slate-300">
+            {subdomain.trim()}.{domain}
+          </span>{' '}
+          → <span className="font-mono text-slate-400">{effectiveServiceUrl}</span>
+        </p>
       )}
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="text-xs text-slate-500">
-          {isRemote
-            ? 'A remote connector cannot reach the panel over Docker; it needs a route to the address above.'
-            : 'The local connector reaches the panel at PANEL_INTERNAL_URL on the shared Docker network.'}
+          Publishing here also adds this hostname to the tunnel&apos;s ingress and to{' '}
+          <span className="text-slate-400">Published apps</span>
+          {selectedTunnel ? ` (${selectedTunnel.name})` : ''}.
         </p>
         <button
           className="btn-primary"
-          disabled={busy || !tunnelId || !hostname || (isRemote && !serviceUrl)}
+          disabled={busy || !tunnelId || !subdomain.trim() || !domain || (isRemote && !serviceUrl.trim())}
           onClick={() => void save()}
         >
           {busy && <Spinner className="h-4 w-4" />} {exposure ? 'Update exposure' : 'Publish panel'}

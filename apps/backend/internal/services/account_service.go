@@ -16,6 +16,7 @@ type AccountService struct {
 	repo       *db.AccountRepository
 	zones      *db.ZoneRepository
 	tunnels    *db.TunnelRepository
+	apps       *db.AppRepository
 	cf         *CF
 	audit      *AuditService
 	conn       ConnectorController
@@ -67,8 +68,8 @@ type ConnectorController interface {
 	RecordRunningVersion(ctx context.Context, tunnel *models.Tunnel)
 }
 
-func NewAccountService(repo *db.AccountRepository, zones *db.ZoneRepository, tunnels *db.TunnelRepository, cf *CF, audit *AuditService, conn ConnectorController) *AccountService {
-	return &AccountService{repo: repo, zones: zones, tunnels: tunnels, cf: cf, audit: audit, conn: conn}
+func NewAccountService(repo *db.AccountRepository, zones *db.ZoneRepository, tunnels *db.TunnelRepository, apps *db.AppRepository, cf *CF, audit *AuditService, conn ConnectorController) *AccountService {
+	return &AccountService{repo: repo, zones: zones, tunnels: tunnels, apps: apps, cf: cf, audit: audit, conn: conn}
 }
 
 type CreateAccountInput struct {
@@ -395,6 +396,20 @@ func (s *AccountService) Delete(ctx context.Context, caller Caller, id string) e
 	tunnels, err := s.tunnels.ListByAccount(ctx, account.ID)
 	if err != nil {
 		return err
+	}
+	// Deleting the account cascades to its tunnels and their published apps. If
+	// one of those apps is the panel exposure, the control plane would vanish
+	// while the operator still believes it is published.
+	for _, tunnel := range tunnels {
+		apps, err := s.apps.ListByTunnel(ctx, tunnel.ID)
+		if err != nil {
+			return err
+		}
+		for _, app := range apps {
+			if app.Kind == "panel" {
+				return Conflict("this account publishes the panel itself; move or remove the panel exposure in Settings before deleting it")
+			}
+		}
 	}
 	for i := range tunnels {
 		_ = s.conn.Stop(ctx, &tunnels[i])

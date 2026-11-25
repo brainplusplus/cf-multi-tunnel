@@ -119,6 +119,10 @@ func (s *Supervisor) EnsureRunning(ctx context.Context, t *models.Tunnel) error 
 	if s.cfg.DockerNetwork != "" {
 		args = append(args, "--network", s.cfg.DockerNetwork)
 	}
+	// Let the connector reach services running on this Docker host, so an app
+	// published as http://host.docker.internal:8080 works without extra setup.
+	// Docker 20.10+ maps the name to the bridge gateway.
+	args = append(args, "--add-host", "host.docker.internal:host-gateway")
 	args = append(args,
 		s.image(ctx),
 		"tunnel", "--no-autoupdate", "run", "--token", token,

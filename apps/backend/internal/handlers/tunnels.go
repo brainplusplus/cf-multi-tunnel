@@ -224,6 +224,10 @@ func (h *AppHandler) Retry(c echo.Context) error {
 	return ok(c, http.StatusOK, app)
 }
 
+func (h *AppHandler) GetPanelAddress(c echo.Context) error {
+	return ok(c, http.StatusOK, h.apps.PanelAddress())
+}
+
 func (h *AppHandler) GetPanelExposure(c echo.Context) error {
 	app, err := h.apps.GetPanelExposure(c.Request().Context())
 	if err != nil {

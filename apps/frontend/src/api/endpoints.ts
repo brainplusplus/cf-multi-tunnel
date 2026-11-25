@@ -6,6 +6,7 @@ import type {
   CFZone,
   ConnectorStatus,
   DashboardStats,
+  PanelAddress,
   PublishedApp,
   ReconcileResult,
   RemoteTag,
@@ -120,6 +121,7 @@ export const appsApi = {
 // ── Panel exposure ──────────────────────────────────────────────────
 export const panelApi = {
   get: () => client.get<PublishedApp | null>('/api/settings/panel-exposure').then((r) => r.data),
+  address: () => client.get<PanelAddress>('/api/settings/panel-address').then((r) => r.data),
   set: (payload: { tunnel_id: string; hostname?: string; subdomain?: string; domain?: string; service_url?: string }) =>
     client.put<PublishedApp>('/api/settings/panel-exposure', payload).then((r) => r.data),
   remove: () => client.delete('/api/settings/panel-exposure'),

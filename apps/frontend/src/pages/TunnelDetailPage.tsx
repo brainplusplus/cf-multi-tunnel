@@ -267,6 +267,11 @@ export default function TunnelDetailPage() {
                     >
                       {app.hostname}
                     </a>
+                    {app.kind === 'panel' && (
+                      <span className="ml-2 align-middle">
+                        <Badge tone="violet">panel</Badge>
+                      </span>
+                    )}
                     <p className="font-mono text-[11px] text-slate-500">{app.path}</p>
                   </td>
                   <td className="td font-mono text-xs">{app.service_url}</td>
@@ -295,9 +300,15 @@ export default function TunnelDetailPage() {
                   </td>
                   <td className="td">
                     <div className="flex justify-end gap-1.5">
-                      <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => void removeApp(app)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {app.kind === 'panel' ? (
+                        <Link to="/settings" className="text-[11px] text-slate-500 hover:text-accent-400">
+                          managed in Settings
+                        </Link>
+                      ) : (
+                        <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => void removeApp(app)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -511,7 +522,12 @@ function PublishAppModal({
   const toast = useToast();
   const [subdomain, setSubdomain] = useState('');
   const [domain, setDomain] = useState(zones[0]?.name ?? '');
-  const [serviceUrl, setServiceUrl] = useState('http://localhost:8080');
+  // A connector runs in its own container, so "localhost" is the container, not
+  // the host. host.docker.internal is injected by the panel (--add-host
+  // host-gateway) to reach services on the Docker host.
+  const [serviceUrl, setServiceUrl] = useState(
+    tunnel.location === 'local' ? 'http://host.docker.internal:8080' : 'http://localhost:8080',
+  );
   const [path, setPath] = useState('/*');
   const [manageDns, setManageDns] = useState(tunnel.config_src === 'cloudflare');
   const [busy, setBusy] = useState(false);
@@ -589,7 +605,7 @@ function PublishAppModal({
         label="Service URL"
         hint={
           tunnel.location === 'local'
-            ? 'Reachable from the connector container on this host.'
+            ? 'Reachable from the connector container. host.docker.internal = this Docker host; a container on the panel network is reachable by its name.'
             : 'Reachable from the device running the connector, not from this panel.'
         }
         error={fields.service_url}

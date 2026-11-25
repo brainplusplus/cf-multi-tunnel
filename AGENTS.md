@@ -59,6 +59,24 @@ already exists, skips hostnames owned by another tunnel, and counts missing remo
 tunnels instead of deleting them. A token missing one permission must not destroy
 working configuration. Do not add deletion to this path.
 
+**Panel exposure is a `published_app` with `kind=panel`.**
+One row drives both sides: `ListEnabledByTunnel` does not filter by `kind`, so the
+exposure becomes an ingress rule on its tunnel and shows up in **Published apps**
+automatically. `kind` is the flag that keeps that consistent — do not add a second
+one. The generic app API refuses `update`/`enable`/`delete` on a panel row (403,
+"managed from Settings"), and deleting a tunnel or account that carries the panel
+is refused (409) because the cascade would silently unpublish the control plane.
+`SetPanelExposure` reuses the existing row and refuses a hostname already owned by
+another app.
+
+**Panel service URL is derived, not typed.**
+`resolvePanelServiceURL`: local tunnel → `PANEL_INTERNAL_URL`; remote tunnel → the
+operator's value, else `PUBLIC_URL` when its host is an IP literal. `checkNoLoop`
+rejects the published hostname, and rejects `PUBLIC_URL` only when it is a DNS name
+(an IP can never loop). Do not restore the old "service URL may never equal
+`PUBLIC_URL`" rule — it breaks the normal single-host install where `PUBLIC_URL` is
+the LAN IP.
+
 **Adding a token upgrades, it does not duplicate.**
 `AccountService.CreateWithToken` reuses an existing `owner_id + account_id` row with
 `credential=token_import` and flips it to `api`. Only a second `api` row is a 409.

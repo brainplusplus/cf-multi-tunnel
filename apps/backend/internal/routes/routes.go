@@ -43,7 +43,7 @@ func Setup(e *echo.Echo, dbConn *gorm.DB, cfg *config.Config, enc *cryptox.Ciphe
 	authSvc := services.NewAuthService(userRepo, tokenRepo, cfg, auditSvc)
 	userSvc := services.NewUserService(userRepo, auditSvc)
 	cf := services.NewCF(cfg, enc)
-	accountSvc := services.NewAccountService(accountRepo, zoneRepo, tunnelRepo, cf, auditSvc, connectorSvc)
+	accountSvc := services.NewAccountService(accountRepo, zoneRepo, tunnelRepo, appRepo, cf, auditSvc, connectorSvc)
 	tunnelSvc := services.NewTunnelService(tunnelRepo, accountRepo, zoneRepo, appRepo, cf, auditSvc, connectorSvc, cfg)
 	appSvc := services.NewAppService(appRepo, tunnelRepo, accountRepo, zoneRepo, tunnelSvc, cf, auditSvc, cfg)
 	// Adding or upgrading a token must pull in the tunnels and hostnames that
@@ -111,6 +111,7 @@ func Setup(e *echo.Echo, dbConn *gorm.DB, cfg *config.Config, enc *cryptox.Ciphe
 	protected.POST("/apps/:id/retry", appH.Retry)
 
 	// Panel exposure is admin-only: it republishes the control plane itself.
+	protected.GET("/settings/panel-address", appH.GetPanelAddress, middleware.AdminOnly)
 	protected.GET("/settings/panel-exposure", appH.GetPanelExposure, middleware.AdminOnly)
 	protected.PUT("/settings/panel-exposure", appH.SetPanelExposure, middleware.AdminOnly)
 	protected.DELETE("/settings/panel-exposure", appH.RemovePanelExposure, middleware.AdminOnly)

@@ -73,11 +73,30 @@ diakhiri `http_status:404`, di bawah lock per-tunnel. DNS dikelola hanya jika
 `manage_dns` aktif; saat impor, DNS diadopsi hanya kalau sudah ada CNAME ke
 `<tunnel-id>.cfargotunnel.com`.
 
+Saat publish, isinya sama seperti Cloudflare sendiri: pilih **subdomain + domain**
+(domain dari zone yang sudah tersinkron), lalu **service URL**. Untuk tunnel `local`,
+ingat connector berjalan di container sendiri, jadi `localhost` bukan host Anda —
+pakai `http://host.docker.internal:8080` (panel menambahkan host-gateway otomatis)
+atau nama container di network `cfmt-panel`.
+
 **Panel exposure** — admin bisa mempublikasikan dashboard ini sendiri lewat tunnel
-(**Settings → Panel exposure**). Untuk tunnel `local`, alamat internal panel dipakai
-otomatis. Untuk tunnel `remote`, Anda wajib mengisi alamat yang bisa dijangkau dari
-perangkat itu (mis. `http://192.168.1.10:7777`); panel menolak alamat yang akan
-memutar balik ke hostname publik atau `PUBLIC_URL`.
+(**Settings → Panel exposure**). Formnya mengikuti alur yang sama: pilih **akun
+(opsional)** untuk mempersempit daftar, pilih **tunnel**, lalu **subdomain + domain**.
+Service URL tidak perlu diisi:
+
+- tunnel `local` → `PANEL_INTERNAL_URL` (mis. `http://reverse-proxy:7777`) dipakai otomatis
+- tunnel `remote` → diisi otomatis dari `PUBLIC_URL` (mis. `http://192.168.0.100:7777`)
+  dan tetap bisa diubah kalau perangkat itu menjangkau panel lewat alamat lain
+
+Panel menolak service URL yang memutar balik ke hostname yang sedang dipublikasikan,
+atau ke `PUBLIC_URL` bila itu berupa nama DNS. IP LAN tidak pernah dianggap loop,
+jadi `PUBLIC_URL=http://192.168.0.100:7777` boleh dipakai ulang.
+
+Exposure disimpan sebagai published app dengan `kind=panel`, jadi hostname-nya
+**otomatis ikut masuk** ke ingress tunnel tersebut dan muncul di halaman
+**Published apps** (dengan badge `panel`). Baris itu tidak bisa diubah/dimatikan/
+dihapus dari daftar app — semuanya lewat Settings. Menghapus tunnel atau akun yang
+sedang memuat exposure juga ditolak sampai exposure dipindah/dihapus dulu.
 
 ## Permission token Cloudflare
 

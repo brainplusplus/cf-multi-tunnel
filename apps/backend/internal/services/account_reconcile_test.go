@@ -110,7 +110,7 @@ func newTestStack(t *testing.T, apiBase string) (*AccountService, *TunnelService
 	cf := NewCF(cfg, cipher)
 
 	tunnelSvc := NewTunnelService(tunnelRepo, accountRepo, zoneRepo, appRepo, cf, auditSvc, nil, cfg)
-	accountSvc := NewAccountService(accountRepo, zoneRepo, tunnelRepo, cf, auditSvc, nil)
+	accountSvc := NewAccountService(accountRepo, zoneRepo, tunnelRepo, appRepo, cf, auditSvc, nil)
 	accountSvc.SetTunnelReconciler(tunnelSvc)
 
 	return accountSvc, tunnelSvc, gdb

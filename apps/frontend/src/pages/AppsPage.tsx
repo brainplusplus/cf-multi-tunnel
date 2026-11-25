@@ -113,16 +113,22 @@ export default function AppsPage() {
                     {app.last_error && <p className="mt-1 max-w-xs truncate text-[11px] text-rose-300/80">{app.last_error}</p>}
                   </td>
                   <td className="td">
-                    <button
-                      role="switch"
-                      aria-checked={app.enabled}
-                      onClick={() => void toggle(app)}
-                      className={`relative h-5 w-9 rounded-full transition-colors ${app.enabled ? 'bg-emerald-500/70' : 'bg-surface-600'}`}
-                    >
-                      <span
-                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${app.enabled ? 'left-[18px]' : 'left-0.5'}`}
-                      />
-                    </button>
+                    {app.kind === 'panel' ? (
+                      <Link to="/settings" className="text-[11px] text-slate-500 hover:text-accent-400">
+                        in Settings
+                      </Link>
+                    ) : (
+                      <button
+                        role="switch"
+                        aria-checked={app.enabled}
+                        onClick={() => void toggle(app)}
+                        className={`relative h-5 w-9 rounded-full transition-colors ${app.enabled ? 'bg-emerald-500/70' : 'bg-surface-600'}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${app.enabled ? 'left-[18px]' : 'left-0.5'}`}
+                        />
+                      </button>
+                    )}
                   </td>
                   <td className="td text-right">
                     {app.sync_status !== 'synced' && (
