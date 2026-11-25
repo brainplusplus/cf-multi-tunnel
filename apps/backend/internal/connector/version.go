@@ -18,6 +18,14 @@ import (
 // like: "cloudflared version 2025.2.1 (built 2025-02-27-1234 UTC)".
 var versionRe = regexp.MustCompile(`version\s+([0-9][0-9A-Za-z.\-]*)`)
 
+// releaseTagRe matches a real cloudflared release tag (CalVer: 2026.11.2).
+// cloudflared also publishes git-describe tags such as "2016-dc57315806d5" and
+// arch variants such as "2026.11.2-amd64". Those start with a digit too, so a
+// loose "starts with a number" check reports them as the newest release, which
+// is why the UI showed LATEST = 2016-dc57315806d5. Anchoring on the CalVer
+// shape is the only reliable filter.
+var releaseTagRe = regexp.MustCompile(`^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}$`)
+
 // ImageInfo describes the image the panel is configured to run.
 type ImageInfo struct {
 	Image     string `json:"image"`
@@ -196,27 +204,31 @@ func (s *Supervisor) ListTags(ctx context.Context, image string, limit int) ([]R
 	return tags, nil
 }
 
+// pickLatestRelease returns the newest real release from a newest-first tag
+// list. Extracted so the selection logic can be tested without HTTP; LatestVersion
+// is the only caller.
+func pickLatestRelease(tags []RemoteTag) (name, updated string) {
+	for _, tag := range tags {
+		if !releaseTagRe.MatchString(tag.Name) {
+			continue
+		}
+		// Tags are already ordered newest-first.
+		return tag.Name, tag.UpdatedAt
+	}
+	return "", ""
+}
+
 // LatestVersion returns the newest published cloudflared release version, used
 // to answer "is an update available?".
 func (s *Supervisor) LatestVersion(ctx context.Context, image string) (string, string, error) {
-	tags, err := s.ListTags(ctx, image, 50)
+	// Scan a wide window: each release publishes ~12 tags (plain, -amd64,
+	// -arm64, digest variants), so 50 tags only covers a few releases.
+	tags, err := s.ListTags(ctx, image, 100)
 	if err != nil {
 		return "", "", err
 	}
-	var newest string
-	var updated string
-	for _, tag := range tags {
-		if !versionRe.MatchString("version " + tag.Name) {
-			continue
-		}
-		// Tags are already ordered newest-first; skip the floating tags.
-		if tag.Name == "latest" || tag.Name == "2025.2.0-rc" || strings.Contains(tag.Name, "dev") {
-			continue
-		}
-		newest, updated = tag.Name, tag.UpdatedAt
-		break
-	}
-	return newest, updated, nil
+	name, updated := pickLatestRelease(tags)
+	return name, updated, nil
 }
 
 func orDefaultLabel(label string) string {

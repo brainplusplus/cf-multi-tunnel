@@ -121,7 +121,7 @@ export interface ConnectorStatus {
   update_available: boolean;
   managed_tunnels: number;
   running_tunnels: number;
-  running_versions: { tunnel_id: string; name: string; version: string; image_ref: string }[] | null;
+  running_versions: { tunnel_id: string; name: string; version: string; image_ref: string }[];
   last_checked_at: string;
 }
 

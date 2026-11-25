@@ -208,10 +208,13 @@ function ConnectorCard() {
     setError('');
     try {
       const result = await connectorApi.update(image, pin);
+      // Defensive: an older backend returned null for empty lists.
+      const recreated = result.recreated ?? [];
+      const failed = result.failed ?? [];
       toast.push(
-        result.failed.length === 0 ? 'success' : 'info',
-        `Updated to ${result.image.version || image}. Recreated ${result.recreated.length} connector(s)` +
-          (result.failed.length ? `, ${result.failed.length} failed` : ''),
+        failed.length === 0 ? 'success' : 'info',
+        `Updated to ${result.image.version || image}. Recreated ${recreated.length} connector(s)` +
+          (failed.length ? `, ${failed.length} failed` : ''),
       );
       await load(false);
     } catch (err) {

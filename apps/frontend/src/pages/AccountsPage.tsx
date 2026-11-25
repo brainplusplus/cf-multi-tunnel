@@ -4,6 +4,7 @@ import { Cloud, KeyRound, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { apiFields, apiMessage } from '../api/client';
 import { accountsApi } from '../api/endpoints';
 import { Badge, EmptyState, ErrorBox, Field, Modal, PageHeader, Spinner } from '../components/ui';
+import { ApiTokenGuide } from '../components/ApiTokenGuide';
 import { useToast } from '../components/Toast';
 import type { CFAccount } from '../types';
 
@@ -232,6 +233,7 @@ function AttachTokenModal({
       onClose={onClose}
       title="Attach an API token"
       description={`Upgrade ${account?.name ?? 'this account'} in place. Its imported tunnels are kept; ingress and DNS become manageable from here.`}
+      wide
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
@@ -263,6 +265,7 @@ function AttachTokenModal({
         After attaching, the panel lists every tunnel the token can see and imports the hostnames already present in each
         tunnel&apos;s ingress. Nothing is deleted.
       </div>
+      <ApiTokenGuide />
     </Modal>
   );
 }
@@ -308,6 +311,7 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
       onClose={onClose}
       title="Add Cloudflare account"
       description="Use a scoped API token. The panel verifies it before saving and stores it encrypted."
+      wide
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
@@ -344,6 +348,7 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
           <li>Zone · DNS · Edit</li>
         </ul>
       </div>
+      <ApiTokenGuide />
     </Modal>
   );
 }
@@ -410,6 +415,26 @@ function ImportTunnelModal({ open, onClose, onDone }: { open: boolean; onClose: 
           placeholder="office-nas"
         />
       </Field>
+      <div className="rounded-lg border border-surface-700 bg-surface-950/50 p-3 text-xs text-slate-400">
+        <p className="font-medium text-slate-300">Where to get this token</p>
+        <p className="mt-1">
+          Cloudflare Zero Trust → <span className="text-slate-300">Networks → Tunnels</span> → open the tunnel (or
+          create one) → the install command for the <span className="text-slate-300">cloudflared</span> connector
+          contains it:{' '}
+          <code className="rounded bg-surface-800 px-1 py-0.5 font-mono text-[11px] text-slate-300">
+            --token eyJ...
+          </code>
+          . Copy only the part after <span className="text-slate-300">--token</span>.
+        </p>
+        <p className="mt-1.5">
+          On an existing host you can also run{' '}
+          <code className="rounded bg-surface-800 px-1 py-0.5 font-mono text-[11px] text-slate-300">
+            cloudflared tunnel token &lt;name&gt;
+          </code>
+          , or read it from that device&apos;s <code className="font-mono text-[11px] text-slate-400">config.yml</code>{' '}
+          / <code className="font-mono text-[11px] text-slate-400">credentials.json</code>.
+        </p>
+      </div>
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
         Imported tunnels are treated as <span className="font-medium">remote</span>: you run cloudflared on that device. A
         tunnel-token account cannot push ingress or DNS through the API, so the panel generates config.yml and shows the

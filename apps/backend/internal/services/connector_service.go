@@ -57,15 +57,23 @@ type TunnelImageVersion struct {
 	ImageRef string `json:"image_ref"`
 }
 
+// newConnectorStatus builds a status with non-nil slices. A nil slice marshals
+// to JSON null and the UI calls .running_versions.length, so every construction
+// must go through here.
+func newConnectorStatus(mode string, dockerAvailable bool) *ConnectorStatus {
+	return &ConnectorStatus{
+		Mode:            mode,
+		DockerAvailable: dockerAvailable,
+		LastCheckedAt:   time.Now().UTC().Format(time.RFC3339),
+		RunningVersions: []TunnelImageVersion{},
+	}
+}
+
 // Status is what the admin "Connector" page renders: what we run, what is
 // newest, and whether an update is available.
 func (s *ConnectorService) Status(ctx context.Context, checkRemote bool) (*ConnectorStatus, error) {
 	image := s.Image(ctx)
-	status := &ConnectorStatus{
-		Mode:            s.cfg.ConnectorMode,
-		DockerAvailable: s.sup.Available(),
-		LastCheckedAt:   time.Now().UTC().Format(time.RFC3339),
-	}
+	status := newConnectorStatus(s.cfg.ConnectorMode, s.sup.Available())
 	if !status.DockerAvailable {
 		status.Image = connector.ImageInfo{Image: image, Error: "docker not reachable from the panel"}
 		return status, nil
@@ -116,6 +124,17 @@ type UpdateResult struct {
 	PreviousImage string              `json:"previous_image"`
 }
 
+// newUpdateResult builds a result with non-nil slices: nil marshals to JSON null
+// and the UI reads .recreated.length / .failed.length.
+func newUpdateResult(image connector.ImageInfo, previous string) *UpdateResult {
+	return &UpdateResult{
+		Image:         image,
+		PreviousImage: previous,
+		Recreated:     []string{},
+		Failed:        []string{},
+	}
+}
+
 // Update pulls the target image, optionally persists it as the new default, and
 // recreates every docker-managed tunnel. Recreate is serialised: two concurrent
 // updates would fight over the same container names.
@@ -147,7 +166,10 @@ func (s *ConnectorService) Update(ctx context.Context, caller Caller, imageRef s
 	s.recreate.Lock()
 	defer s.recreate.Unlock()
 
-	result := &UpdateResult{Image: *pulled, PreviousImage: previous}
+	// Empty slices, not nil: a nil slice marshals to JSON null and the UI reads
+	// .length on both fields, which threw "Cannot read properties of null" on
+	// an install with no docker-managed tunnels yet.
+	result := newUpdateResult(*pulled, previous)
 	tunnels, err := s.tunnels.List(ctx, db.Actor{Admin: true}, "", "")
 	if err != nil {
 		return nil, err
