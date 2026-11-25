@@ -255,12 +255,23 @@ function AttachTokenModal({
           autoComplete="off"
         />
       </Field>
-      <ul className="list-inside list-disc rounded-lg border border-surface-700 bg-surface-950/50 p-3 text-xs text-slate-400">
-        <li>Account · Cloudflare Tunnel · Edit</li>
-        <li>Account · Account Settings · Read</li>
-        <li>Zone · Zone · Read</li>
-        <li>Zone · DNS · Edit</li>
-      </ul>
+      <div className="rounded-lg border border-surface-700 bg-surface-950/50 p-3 text-xs text-slate-400">
+        <p className="font-medium text-slate-300">Required permissions — two policies</p>
+        <ul className="mt-1 list-inside list-disc space-y-0.5">
+          <li>
+            <span className="text-slate-300">Account policy</span> → Cloudflare Tunnel · Edit
+          </li>
+          <li>
+            <span className="text-slate-300">Account policy</span> → Account Settings · Read
+          </li>
+          <li>
+            <span className="text-slate-300">Zone policy</span> → Zone · Read
+          </li>
+          <li>
+            <span className="text-slate-300">Zone policy</span> → DNS · Edit
+          </li>
+        </ul>
+      </div>
       <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">
         After attaching, the panel lists every tunnel the token can see and imports the hostnames already present in each
         tunnel&apos;s ingress. Nothing is deleted.
@@ -340,12 +351,20 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
         <input className="field font-mono text-xs" value={accountId} onChange={(e) => setAccountId(e.target.value)} />
       </Field>
       <div className="rounded-lg border border-surface-700 bg-surface-950/50 p-3 text-xs text-slate-400">
-        <p className="font-medium text-slate-300">Required token permissions</p>
+        <p className="font-medium text-slate-300">Required permissions — two policies</p>
         <ul className="mt-1 list-inside list-disc space-y-0.5">
-          <li>Account · Cloudflare Tunnel · Edit</li>
-          <li>Account · Account Settings · Read</li>
-          <li>Zone · Zone · Read</li>
-          <li>Zone · DNS · Edit</li>
+          <li>
+            <span className="text-slate-300">Account policy</span> → Cloudflare Tunnel · Edit
+          </li>
+          <li>
+            <span className="text-slate-300">Account policy</span> → Account Settings · Read
+          </li>
+          <li>
+            <span className="text-slate-300">Zone policy</span> → Zone · Read
+          </li>
+          <li>
+            <span className="text-slate-300">Zone policy</span> → DNS · Edit
+          </li>
         </ul>
       </div>
       <ApiTokenGuide />

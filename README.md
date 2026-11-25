@@ -100,29 +100,61 @@ sedang memuat exposure juga ditolak sampai exposure dipindah/dihapus dulu.
 
 ## Permission token Cloudflare
 
-Buat token di Cloudflare Dashboard → My Profile → API Tokens → **Create Token** →
-**Create Custom Token** (preset tidak punya akses tunnel):
+Cloudflare sekarang memakai editor token berbasis **Policies**: satu policy punya satu
+scope (Account / Zone / User), jadi izin yang dibutuhkan panel dipecah menjadi **dua
+policy**. Alurnya:
 
-1. Token name: bebas, mis. `cf-tunnel-panel`
-2. Permissions — tiap baris tiga dropdown (group, resource, level):
+1. Cloudflare Dashboard → My Profile → **API Tokens** → **Create Token**
+2. Pilih **Create Custom Token** (template yang tersedia tidak punya akses tunnel)
+3. **Token name**: bebas, mis. `cf-multi-tunnel`
+4. **Policy 1 — Account.** Klik `+ Add new policy`, set tipe **Account**, lalu
+   `Include → Specific account` → pilih akun pemilik tunnel. Di kotak
+   **"Search for permission groups…"** cari dan centang:
 
-| Scope | Permission | Dipakai untuk |
+   | Cari | Permission group | Centang |
+   |---|---|---|
+   | `cloudflare tunnel` | Cloudflare Tunnel | **Edit** |
+   | `account settings` | Account Settings | **Read** |
+
+5. **Policy 2 — Zone.** Klik `+ Add new policy` lagi, set tipe **Zone**, lalu
+   `Include → Specific zone` → pilih domain tujuan (tambah satu policy per domain,
+   atau pakai `All zones from an account`). Centang:
+
+   | Cari | Permission group | Centang |
+   |---|---|---|
+   | `zone` | Zone | **Read** |
+   | `dns` | DNS | **Edit** |
+
+6. **Token expiration**: pilih sesuai kebijakan Anda. `No expiration` membuat panel
+   terus jalan sampai token di-roll; tanggal tetap berarti harus diingat untuk diganti.
+   **Client IP address filtering** biarkan kosong kecuali panel punya IP keluar tetap.
+7. **Continue to summary → Create Token**, lalu copy (hanya ditampilkan sekali).
+
+Jangan dicentang (sering salah klik):
+
+- **Apps** (grup *Account & Billing*) — deprecated, tidak ada hubungannya dengan tunnel.
+- **Cloudflare One Connector: cloudflared** — mengatur connector yang dikelola
+  Cloudflare Zero Trust, bukan konfigurasi tunnel. Panel menjalankan cloudflared
+  sendiri, jadi tidak perlu.
+- Izin **Account** di dalam **Zone policy** — tiap policy hanya satu scope, jadi
+  editor menyembunyikannya. Itu sebabnya perlu dua policy.
+
+Ringkasnya, yang dipakai panel:
+
+| Policy | Permission | Dipakai untuk |
 |---|---|---|
 | Account | Cloudflare Tunnel · Edit | list/read/tulis ingress tunnel |
 | Account | Account Settings · Read | verifikasi token & nama akun |
 | Zone | Zone · Read | cari zone pemilik hostname |
 | Zone | DNS · Edit | buat/ubah CNAME ke tunnel |
 
-3. Account Resources: Include → akun pemilik tunnel
-4. Zone Resources: Include → All zones from that account (atau zone tertentu)
-5. Continue to summary → Create Token → copy (hanya ditampilkan sekali)
-
 Account ID opsional — panel membacanya dari token. Isi hanya kalau satu token bisa
 melihat beberapa akun; nilainya ada di URL dashboard
 (`dash.cloudflare.com/<account-id>`) atau sidebar Overview sebuah domain.
 
-Panduan langkah demi langkah yang sama juga tersedia langsung di dalam modal
-**Accounts → Add API token**, lengkap dengan link ke halaman token Cloudflare.
+Panduan langkah demi langkah yang sama (termasuk tabel per-policy dan daftar
+"jangan dicentang") juga tersedia langsung di dalam modal
+**Accounts → Add API token** dan **Attach an API token**.
 
 Token disimpan terenkripsi AES-256-GCM dan tidak pernah dikembalikan lewat API
 (hanya `token_hint`). Kunci enkripsi ada di volume data; kalau kunci hilang, semua
