@@ -172,6 +172,7 @@ export default function TunnelsPage() {
                 <th className="th">Account</th>
                 <th className="th">Placement</th>
                 <th className="th">Config</th>
+                <th className="th">Apps</th>
                 <th className="th">Status</th>
                 <th className="th text-right">Actions</th>
               </tr>
@@ -204,6 +205,18 @@ export default function TunnelsPage() {
                     <Badge tone={tunnel.config_src === 'cloudflare' ? 'green' : 'amber'}>{tunnel.config_src}</Badge>
                   </td>
                   <td className="td">
+                    {tunnel.apps_count > 0 ? (
+                      <Link
+                        to={`/tunnels/${tunnel.id}`}
+                        className="inline-flex items-center gap-1 text-xs text-accent-400 hover:text-accent-300"
+                      >
+                        {tunnel.apps_count} {tunnel.apps_count === 1 ? 'app' : 'apps'}
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-slate-500">none</span>
+                    )}
+                  </td>
+                  <td className="td">
                     <Badge tone={statusTone(tunnel.status)} dot>
                       {tunnel.status}
                     </Badge>
@@ -217,8 +230,12 @@ export default function TunnelsPage() {
                     )}
                   </td>
                   <td className="td">
-                    <div className="flex justify-end">
-                      {tunnel.location === 'local' && tunnel.connector_mode === 'docker' ? (
+                    <div className="flex items-center justify-end gap-1">
+                      {/* Start/Stop is lifecycle, Open is navigation. A managed
+                          tunnel used to show only Start/Stop, which left no way
+                          into its detail page — and therefore no way to publish
+                          an app on the tunnel that runs on this very server. */}
+                      {tunnel.location === 'local' && tunnel.connector_mode === 'docker' && (
                         <button
                           className="btn-ghost !px-2 !py-1 !text-xs"
                           disabled={busyId === tunnel.id}
@@ -233,11 +250,10 @@ export default function TunnelsPage() {
                           )}
                           {tunnel.status === 'running' ? 'Stop' : 'Start'}
                         </button>
-                      ) : (
-                        <Link to={`/tunnels/${tunnel.id}`} className="btn-ghost !px-2 !py-1 !text-xs">
-                          Open
-                        </Link>
                       )}
+                      <Link to={`/tunnels/${tunnel.id}`} className="btn-ghost !px-2 !py-1 !text-xs">
+                        Open
+                      </Link>
                     </div>
                   </td>
                 </tr>

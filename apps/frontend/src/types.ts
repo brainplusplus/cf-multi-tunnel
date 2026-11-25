@@ -71,6 +71,9 @@ export interface Tunnel {
   image_version: string;
   last_seen_at: string | null;
   created_at: string;
+  // Number of published apps routed through this tunnel, filled by the list
+  // endpoint so the table can show it without one request per row.
+  apps_count: number;
 }
 
 export type SyncStatus = 'synced' | 'pending' | 'error' | 'manual';
@@ -88,6 +91,9 @@ export interface PublishedApp {
   dns_record_id: string;
   manage_dns: boolean;
   proxied: boolean;
+  // Origin options stored for this app (e.g. { noTLSVerify: true }). The edit
+  // form reads it so saving never silently drops what was configured.
+  origin_request?: Record<string, unknown>;
   enabled: boolean;
   sync_status: SyncStatus;
   last_error: string;

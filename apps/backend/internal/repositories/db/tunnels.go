@@ -24,7 +24,45 @@ func (r *TunnelRepository) List(ctx context.Context, actor Actor, accountID, loc
 	if err := q.Order("created_at DESC").Find(&tunnels).Error; err != nil {
 		return nil, err
 	}
+	if err := r.fillAppCounts(ctx, tunnels); err != nil {
+		return nil, err
+	}
 	return tunnels, nil
+}
+
+// fillAppCounts attaches the number of published apps per tunnel in one grouped
+// query. The tunnels list must answer "how much is routed through this tunnel"
+// without the UI issuing one request per row.
+func (r *TunnelRepository) fillAppCounts(ctx context.Context, tunnels []models.Tunnel) error {
+	if len(tunnels) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(tunnels))
+	for i := range tunnels {
+		ids = append(ids, tunnels[i].ID)
+	}
+
+	type row struct {
+		TunnelID string
+		N        int64
+	}
+	var rows []row
+	if err := r.db.WithContext(ctx).
+		Model(&models.PublishedApp{}).
+		Select("tunnel_id, COUNT(*) AS n").
+		Where("tunnel_id IN ?", ids).
+		Group("tunnel_id").
+		Scan(&rows).Error; err != nil {
+		return err
+	}
+	counts := make(map[string]int64, len(rows))
+	for _, row := range rows {
+		counts[row.TunnelID] = row.N
+	}
+	for i := range tunnels {
+		tunnels[i].AppsCount = counts[tunnels[i].ID]
+	}
+	return nil
 }
 
 func (r *TunnelRepository) FindByID(ctx context.Context, id string) (*models.Tunnel, error) {

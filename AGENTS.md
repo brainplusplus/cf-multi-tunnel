@@ -51,6 +51,22 @@ Never infer placement from `credential`. A tunnel on another device must stay
 (`TunnelService.ingressLocks`); two concurrent publishes on one tunnel would otherwise
 lose a rule. Never patch a single rule in place.
 
+**Reading ingress is `result.config.ingress`, never `result.ingress`.**
+`cloudflare.GetTunnelConfig` decodes the `{"config": {...}}` wrapper. Decoding `result`
+directly yields an empty ingress with **no error**, which is indistinguishable from a
+tunnel with no hostnames — that shipped once and made every account import zero apps.
+Test fakes must return the nested shape too, or the bug passes green.
+`PutTunnelConfig` keeps sending `{"config": cfg}`.
+
+**Origin options travel as `origin_request` on the app API.**
+`PublishedApp.OriginRequestJSON` is the stored column (`json:"-"`);
+`PublishedApp.OriginRequest` is the same bytes exposed as an object, filled by
+`AfterFind`. The edit form must be able to see `noTLSVerify`, otherwise saving a
+hostname change silently turns TLS verification back on. A nil field means "leave
+alone"; `{}` means "clear" and empties the column. A service URL typed as
+`192.168.0.103:80` is read as `http://…` by `ValidateServiceURL` — Cloudflare needs a
+scheme and the raw parse error is useless to an operator.
+
 **Account sync is an upsert that never deletes.**
 `TunnelService.ReconcileAccount` (`services/account_reconcile.go`) creates or refreshes
 remote tunnels and imports ingress hostnames as `published_apps`. It preserves

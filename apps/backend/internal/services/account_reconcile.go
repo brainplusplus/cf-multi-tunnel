@@ -25,6 +25,37 @@ type ReconcileResult struct {
 	Skipped        []string `json:"skipped,omitempty"`
 }
 
+// remoteTunnelStatus translates Cloudflare's own tunnel status into the panel's
+// vocabulary so a freshly imported tunnel is never shown as "unknown" while the
+// 60-second worker has not run yet.
+//
+// healthy  -> running        degraded -> running, but flagged unhealthy
+// down     -> stopped        inactive -> stopped (never connected)
+func remoteTunnelStatus(rt cloudflare.RemoteTunnel) string {
+	switch strings.ToLower(strings.TrimSpace(rt.Status)) {
+	case "healthy":
+		return "running"
+	case "degraded":
+		return "running"
+	case "down", "inactive":
+		return "stopped"
+	}
+	// Older API responses omit status but still report the last connection.
+	if rt.ConnActive != nil {
+		return "running"
+	}
+	return "unknown"
+}
+
+// remoteTunnelStatusMessage keeps Cloudflare's own wording for the states that
+// are not plain up/down, so "running" never hides a degraded connector.
+func remoteTunnelStatusMessage(rt cloudflare.RemoteTunnel) string {
+	if strings.EqualFold(rt.Status, "degraded") {
+		return "Cloudflare reports this tunnel as degraded"
+	}
+	return ""
+}
+
 // ReconcileAccount makes the panel match what Cloudflare already holds for this
 // account. It is an upsert in the two directions that matter:
 //
@@ -92,7 +123,11 @@ func (s *TunnelService) ReconcileAccount(ctx context.Context, caller Caller, acc
 				Location:      "remote",
 				HostLabel:     "discovered on Cloudflare",
 				ConnectorMode: "external",
-				Status:        "unknown",
+				// Cloudflare already told us whether it is up. Starting at
+				// "unknown" would show a wrong badge until the worker ticks.
+				Status:        remoteTunnelStatus(rt),
+				StatusMessage: remoteTunnelStatusMessage(rt),
+				LastSeenAt:    rt.ConnActive,
 			}
 			if err := s.tunnels.Create(ctx, local); err != nil {
 				return nil, err
@@ -110,6 +145,18 @@ func (s *TunnelService) ReconcileAccount(ctx context.Context, caller Caller, acc
 			// Reaching it through the API proves it does now.
 			if local.Credential != "api" {
 				local.Credential, changed = "api", true
+			}
+			// Same reasoning as above, for rows that already exist: a sync is a
+			// fresh observation, so take the status from it instead of leaving
+			// whatever the last worker wrote.
+			if status := remoteTunnelStatus(rt); status != "unknown" && local.Status != status {
+				local.Status, changed = status, true
+			}
+			if msg := remoteTunnelStatusMessage(rt); local.StatusMessage != msg {
+				local.StatusMessage, changed = msg, true
+			}
+			if rt.ConnActive != nil {
+				local.LastSeenAt = rt.ConnActive
 			}
 			if changed {
 				if err := s.tunnels.Update(ctx, local); err != nil {
@@ -232,6 +279,19 @@ func (s *TunnelService) importIngress(
 			}
 		}
 		if err := s.apps.Create(ctx, app); err != nil {
+			// The unique index on hostname is the last line of defence. If it
+			// fires, the row appeared after our lookup (a duplicate rule in the
+			// same ingress, or the hostname already lives on another tunnel).
+			// Never surface the raw SQLite text: say what actually happened and
+			// keep importing the rest.
+			if other, findErr := s.apps.FindByHostname(ctx, host); findErr == nil && other != nil {
+				if other.TunnelID == tunnel.ID {
+					res.Skipped = append(res.Skipped, host+" appears more than once in this tunnel's ingress")
+				} else {
+					res.Skipped = append(res.Skipped, host+" is already published on another tunnel")
+				}
+				continue
+			}
 			res.Skipped = append(res.Skipped, host+": "+err.Error())
 			continue
 		}

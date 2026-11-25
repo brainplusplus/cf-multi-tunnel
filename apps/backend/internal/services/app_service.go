@@ -219,7 +219,14 @@ func (s *AppService) Update(ctx context.Context, caller Caller, id string, in Cr
 		if !json.Valid(in.OriginRequest) {
 			return nil, Validation(map[string]string{"origin_request": "must be valid JSON"})
 		}
-		app.OriginRequestJSON = string(in.OriginRequest)
+		// An empty object means "the operator cleared every origin option".
+		// Storing "{}" would keep sending a pointless originRequest block in
+		// the ingress rule, so it clears the column instead.
+		if compact := strings.TrimSpace(string(in.OriginRequest)); compact == "{}" {
+			app.OriginRequestJSON = ""
+		} else {
+			app.OriginRequestJSON = compact
+		}
 	}
 	if zone, zoneErr := s.resolveZone(ctx, account.ID, hostname); zoneErr == nil && zone != nil {
 		app.ZoneID = zone.ZoneID

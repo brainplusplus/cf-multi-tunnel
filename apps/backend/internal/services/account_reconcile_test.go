@@ -62,14 +62,20 @@ func fakeCloudflare(t *testing.T) *httptest.Server {
 	})
 	mux.HandleFunc("/accounts/acct-1/cfd_tunnel", func(w http.ResponseWriter, r *http.Request) {
 		write(w, []map[string]any{
-			{"id": "tunnel-a", "name": "server-a", "config_src": "cloudflare"},
-			{"id": "tunnel-b", "name": "laptop-b", "config_src": "cloudflare"},
+			{"id": "tunnel-a", "name": "server-a", "config_src": "cloudflare", "status": "healthy"},
+			{"id": "tunnel-b", "name": "laptop-b", "config_src": "cloudflare", "status": "inactive"},
 		})
 	})
 	for id, rules := range ingress {
 		id, rules := id, rules
 		mux.HandleFunc("/accounts/acct-1/cfd_tunnel/"+id+"/configurations", func(w http.ResponseWriter, r *http.Request) {
-			write(w, map[string]any{"ingress": rules})
+			if r.Method == http.MethodPut {
+				write(w, map[string]any{"config": map[string]any{"ingress": rules}})
+				return
+			}
+			// Real shape: result.config.ingress. A flat result.ingress is what
+			// the client used to parse, and what made every import look empty.
+			write(w, map[string]any{"config": map[string]any{"ingress": rules}})
 		})
 	}
 	mux.HandleFunc("/zones/zone-1/dns_records", func(w http.ResponseWriter, r *http.Request) {
@@ -247,5 +253,70 @@ func TestReconcileIsIdempotent(t *testing.T) {
 	gdb.Model(&models.PublishedApp{}).Count(&appCount)
 	if tunnelCount != 2 || appCount != 2 {
 		t.Fatalf("duplicate rows created: tunnels=%d apps=%d", tunnelCount, appCount)
+	}
+}
+
+// TestReconcileUsesCloudflareStatusAndCountsApps covers the two things the
+// tunnels page shows right after an import. Both used to be wrong: every tunnel
+// was created with status "unknown" even though Cloudflare had already said
+// healthy/inactive, and the app count was never sent to the UI at all.
+func TestReconcileUsesCloudflareStatusAndCountsApps(t *testing.T) {
+	server := fakeCloudflare(t)
+	defer server.Close()
+
+	accountSvc, tunnelSvc, gdb := newTestStack(t, server.URL)
+	ctx := context.Background()
+	caller := Caller{ID: "user-1", Email: "u@example.com", Admin: true}
+
+	account, err := accountSvc.CreateWithToken(ctx, caller, CreateAccountInput{APIToken: "cf-token"})
+	if err != nil {
+		t.Fatalf("create account: %v", err)
+	}
+
+	// The fake reports tunnel-a as healthy and tunnel-b as inactive. A freshly
+	// imported row must reflect that immediately, without waiting for the
+	// 60-second status worker.
+	var running, stopped models.Tunnel
+	if err := gdb.First(&running, "tunnel_id = ?", "tunnel-a").Error; err != nil {
+		t.Fatalf("tunnel-a missing: %v", err)
+	}
+	if running.Status != "running" {
+		t.Fatalf("healthy tunnel imported as %q, want running", running.Status)
+	}
+	if err := gdb.First(&stopped, "tunnel_id = ?", "tunnel-b").Error; err != nil {
+		t.Fatalf("tunnel-b missing: %v", err)
+	}
+	if stopped.Status != "stopped" {
+		t.Fatalf("inactive tunnel imported as %q, want stopped", stopped.Status)
+	}
+
+	// The list the UI reads must carry the app count per tunnel.
+	tunnels, err := tunnelSvc.List(ctx, caller, account.ID, "")
+	if err != nil {
+		t.Fatalf("list tunnels: %v", err)
+	}
+	byName := make(map[string]models.Tunnel, len(tunnels))
+	for _, tn := range tunnels {
+		byName[tn.TunnelID] = tn
+	}
+	if got := byName["tunnel-a"].AppsCount; got != 1 {
+		t.Fatalf("tunnel-a apps_count = %d, want 1", got)
+	}
+	if got := byName["tunnel-b"].AppsCount; got != 1 {
+		t.Fatalf("tunnel-b apps_count = %d, want 1", got)
+	}
+
+	// And the statuses survive a re-sync instead of drifting back to unknown.
+	if _, err := tunnelSvc.ReconcileAccount(ctx, caller, account.ID); err != nil {
+		t.Fatalf("re-sync: %v", err)
+	}
+	tunnels, err = tunnelSvc.List(ctx, caller, account.ID, "")
+	if err != nil {
+		t.Fatalf("list after re-sync: %v", err)
+	}
+	for _, tn := range tunnels {
+		if tn.Status == "unknown" {
+			t.Fatalf("tunnel %s fell back to unknown after a re-sync", tn.Name)
+		}
 	}
 }

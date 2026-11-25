@@ -283,13 +283,21 @@ type TunnelConfig struct {
 	OriginRequest json.RawMessage `json:"originRequest,omitempty"`
 }
 
+// GetTunnelConfig reads the remote ingress list.
+//
+// The API wraps it: result.config.ingress. Decoding result directly into
+// TunnelConfig silently yields an empty ingress, which looks exactly like a
+// tunnel with no hostnames — no error, no apps, nothing to report. The wrapper
+// is therefore explicit here.
 func (c *Client) GetTunnelConfig(ctx context.Context, accountID, tunnelID string) (*TunnelConfig, error) {
-	var out TunnelConfig
+	var body struct {
+		Config TunnelConfig `json:"config"`
+	}
 	path := fmt.Sprintf("/accounts/%s/cfd_tunnel/%s/configurations", url.PathEscape(accountID), url.PathEscape(tunnelID))
-	if _, err := c.do(ctx, http.MethodGet, path, nil, &out); err != nil {
+	if _, err := c.do(ctx, http.MethodGet, path, nil, &body); err != nil {
 		return nil, err
 	}
-	return &out, nil
+	return &body.Config, nil
 }
 
 // PutTunnelConfig replaces the whole ingress list. Cloudflare has no partial

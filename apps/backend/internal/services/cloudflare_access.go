@@ -96,10 +96,20 @@ var allowedSchemes = map[string]bool{
 // ValidateServiceURL checks the origin form Cloudflare accepts. It intentionally
 // allows private hosts (10.x, localhost) because that is the normal case for a
 // tunnel pointing at an internal service.
+//
+// A bare "host:port" is accepted and read as http. Cloudflare requires a scheme,
+// and "192.168.0.103:80" is how an operator naturally writes a LAN address; the
+// resulting parse error ("first path segment in URL cannot contain colon") says
+// nothing useful, so it is normalised here instead.
 func ValidateServiceURL(raw string) (string, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
 		return "", errors.New("service URL is required")
+	}
+	// Every accepted scheme is written with "://", so its absence means the
+	// operator omitted it rather than picked an exotic one.
+	if !strings.Contains(s, "://") {
+		s = "http://" + s
 	}
 	parsed, err := url.Parse(s)
 	if err != nil {

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 
 	"cf-multi-tunnel/backend/internal/domain/identity"
@@ -152,6 +153,11 @@ type Tunnel struct {
 	LastSeenAt      *time.Time `json:"last_seen_at"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
+
+	// AppsCount is filled by the repository for list responses. It is not a
+	// column: it is a count of this tunnel's published apps, so the tunnels
+	// table can show how much is actually routed through each one.
+	AppsCount int64 `json:"apps_count" gorm:"-"`
 }
 
 // ManagedLocally is the single gate for container operations. Any code that
@@ -179,29 +185,47 @@ func (t *Tunnel) RemoteConfigurable() bool { return t.ConfigSrc == "cloudflare" 
 // unique: Cloudflare refuses two tunnels claiming the same hostname, so the
 // panel rejects it before the API does.
 type PublishedApp struct {
-	ID                string    `json:"id" gorm:"primaryKey;type:text"`
-	OwnerID           string    `json:"owner_id" gorm:"index;not null"`
-	TunnelID          string    `json:"tunnel_id" gorm:"index;not null"`
-	Kind              string    `json:"kind" gorm:"default:app"` // app | panel
-	Hostname          string    `json:"hostname" gorm:"uniqueIndex;not null"`
-	Path              string    `json:"path" gorm:"default:/*"`
-	ServiceURL        string    `json:"service_url" gorm:"not null"`
-	ZoneID            string    `json:"zone_id"`
-	ZoneName          string    `json:"zone_name"`
-	DNSRecordID       string    `json:"dns_record_id"`
-	ManageDNS         bool      `json:"manage_dns" gorm:"default:true"`
-	Proxied           bool      `json:"proxied" gorm:"default:true"`
-	OriginRequestJSON string    `json:"-" gorm:"column:origin_request_json"`
-	Enabled           bool      `json:"enabled" gorm:"default:true"`
-	SyncStatus        string    `json:"sync_status" gorm:"default:pending"` // synced | pending | error
-	LastError         string    `json:"last_error"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                string `json:"id" gorm:"primaryKey;type:text"`
+	OwnerID           string `json:"owner_id" gorm:"index;not null"`
+	TunnelID          string `json:"tunnel_id" gorm:"index;not null"`
+	Kind              string `json:"kind" gorm:"default:app"` // app | panel
+	Hostname          string `json:"hostname" gorm:"uniqueIndex;not null"`
+	Path              string `json:"path" gorm:"default:/*"`
+	ServiceURL        string `json:"service_url" gorm:"not null"`
+	ZoneID            string `json:"zone_id"`
+	ZoneName          string `json:"zone_name"`
+	DNSRecordID       string `json:"dns_record_id"`
+	ManageDNS         bool   `json:"manage_dns" gorm:"default:true"`
+	Proxied           bool   `json:"proxied" gorm:"default:true"`
+	OriginRequestJSON string `json:"-" gorm:"column:origin_request_json"`
+	// OriginRequest is the same value as OriginRequestJSON, exposed as an object
+	// so the UI can show and edit it (for example noTLSVerify). It is filled by
+	// AfterFind and never stored itself.
+	OriginRequest json.RawMessage `json:"origin_request,omitempty" gorm:"-"`
+	Enabled       bool            `json:"enabled" gorm:"default:true"`
+	SyncStatus    string          `json:"sync_status" gorm:"default:pending"` // synced | pending | error
+	LastError     string          `json:"last_error"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
 func (p *PublishedApp) BeforeCreate(*gorm.DB) error {
 	if p.ID == "" {
 		p.ID = identity.New()
+	}
+	return nil
+}
+
+// AfterFind keeps OriginRequest in sync with the stored column so a read never
+// returns an app whose origin settings are invisible to the caller. An edit form
+// that cannot see noTLSVerify would silently drop it on save.
+func (p *PublishedApp) AfterFind(*gorm.DB) error {
+	p.OriginRequest = nil
+	if p.OriginRequestJSON == "" || p.OriginRequestJSON == "null" {
+		return nil
+	}
+	if json.Valid([]byte(p.OriginRequestJSON)) {
+		p.OriginRequest = json.RawMessage(p.OriginRequestJSON)
 	}
 	return nil
 }

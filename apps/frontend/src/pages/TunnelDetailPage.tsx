@@ -10,6 +10,7 @@ import {
   Pencil,
   Play,
   Plus,
+  RefreshCw,
   Square,
   Terminal,
   Trash2,
@@ -35,6 +36,8 @@ export default function TunnelDetailPage() {
   const [showConfig, setShowConfig] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [showAppModal, setShowAppModal] = useState(false);
+  // null means "create", otherwise the modal edits that row.
+  const [editingApp, setEditingApp] = useState<PublishedApp | null>(null);
   const [showPlacement, setShowPlacement] = useState(false);
   const [configYml, setConfigYml] = useState('');
   const [token, setToken] = useState('');
@@ -104,6 +107,29 @@ export default function TunnelDetailPage() {
     }
   };
 
+  // Pull this account's remote ingress into the panel, then reload. Without this
+  // the page can only ever show what the panel already knows, so a tunnel whose
+  // routes live only in Cloudflare looks empty forever.
+  const syncFromCloudflare = async () => {
+    if (!tunnel) return;
+    setBusy('sync');
+    try {
+      const res = await tunnelsApi.sync(tunnel.cf_account_id);
+      await load();
+      const { apps_created: created, apps_updated: updated } = res.result;
+      toast.push(
+        created + updated === 0 ? 'info' : 'success',
+        created + updated === 0
+          ? 'Cloudflare has no new hostnames for this account.'
+          : `Imported ${created} new hostname(s), refreshed ${updated}.`,
+      );
+    } catch (err) {
+      toast.push('error', apiMessage(err));
+    } finally {
+      setBusy('');
+    }
+  };
+
   const remove = async () => {
     if (!tunnel) return;
     if (!window.confirm(`Delete tunnel ${tunnel.name}? It is also removed from Cloudflare.`)) return;
@@ -150,6 +176,9 @@ export default function TunnelDetailPage() {
         description={`${account?.name ?? 'account'} · ${tunnel.tunnel_id}`}
         actions={
           <>
+            <button className="btn-ghost" disabled={busy === 'sync'} onClick={() => void syncFromCloudflare()}>
+              {busy === 'sync' ? <Spinner className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />} Sync
+            </button>
             <button className="btn-ghost" onClick={() => void openConfig()}>
               <FileCode2 className="h-4 w-4" /> config.yml
             </button>
@@ -173,7 +202,7 @@ export default function TunnelDetailPage() {
                 {tunnel.status === 'running' ? 'Stop' : 'Start'}
               </button>
             )}
-            <button className="btn-primary" onClick={() => setShowAppModal(true)}>
+            <button className="btn-primary" onClick={() => { setEditingApp(null); setShowAppModal(true); }}>
               <Plus className="h-4 w-4" /> Publish app
             </button>
             <button className="btn-danger" onClick={() => void remove()}>
@@ -239,7 +268,7 @@ export default function TunnelDetailPage() {
             title="Nothing published yet"
             description="Add a hostname and the panel writes the ingress rule and the DNS CNAME for you."
             action={
-              <button className="btn-primary" onClick={() => setShowAppModal(true)}>
+              <button className="btn-primary" onClick={() => { setEditingApp(null); setShowAppModal(true); }}>
                 <Plus className="h-4 w-4" /> Publish app
               </button>
             }
@@ -305,9 +334,25 @@ export default function TunnelDetailPage() {
                           managed in Settings
                         </Link>
                       ) : (
-                        <button className="btn-ghost !px-2 !py-1 !text-xs" onClick={() => void removeApp(app)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <>
+                          <button
+                            className="btn-ghost !px-2 !py-1 !text-xs"
+                            title="Edit hostname or origin"
+                            onClick={() => {
+                              setEditingApp(app);
+                              setShowAppModal(true);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            className="btn-ghost !px-2 !py-1 !text-xs"
+                            title="Delete this hostname"
+                            onClick={() => void removeApp(app)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -386,9 +431,14 @@ export default function TunnelDetailPage() {
         open={showAppModal}
         tunnel={tunnel}
         zones={zones}
-        onClose={() => setShowAppModal(false)}
+        app={editingApp}
+        onClose={() => {
+          setShowAppModal(false);
+          setEditingApp(null);
+        }}
         onDone={() => {
           setShowAppModal(false);
+          setEditingApp(null);
           void load();
         }}
       />
@@ -510,12 +560,15 @@ function PublishAppModal({
   open,
   tunnel,
   zones,
+  app,
   onClose,
   onDone,
 }: {
   open: boolean;
   tunnel: Tunnel;
   zones: CFZone[];
+  // When set, the modal edits that app instead of creating a new one.
+  app?: PublishedApp | null;
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -530,13 +583,38 @@ function PublishAppModal({
   );
   const [path, setPath] = useState('/*');
   const [manageDns, setManageDns] = useState(tunnel.config_src === 'cloudflare');
+  // A LAN service served over HTTPS usually has a certificate for its own name,
+  // not for the public hostname, so cloudflared must be told to skip the check.
+  // Without this, pointing at https://192.168.0.103 fails with a TLS error.
+  const [skipTLSVerify, setSkipTLSVerify] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [fields, setFields] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (zones.length > 0 && !domain) setDomain(zones[0].name);
-  }, [zones, domain]);
+    if (!open) return;
+    setError('');
+    setFields({});
+    if (app) {
+      // Split the stored hostname on the longest matching zone so the two
+      // fields show what was saved rather than an empty form.
+      const zone = [...zones].sort((a, b) => b.name.length - a.name.length).find((z) => app.hostname.endsWith('.' + z.name));
+      setSubdomain(zone ? app.hostname.slice(0, -(zone.name.length + 1)) : app.hostname);
+      setDomain(zone ? zone.name : app.zone_name || '');
+      setServiceUrl(app.service_url);
+      setPath(app.path);
+      setManageDns(app.manage_dns);
+      setSkipTLSVerify(app.origin_request?.noTLSVerify === true);
+      return;
+    }
+    setSubdomain('');
+    setDomain(zones[0]?.name ?? '');
+    setServiceUrl(tunnel.location === 'local' ? 'http://host.docker.internal:8080' : 'http://localhost:8080');
+    setPath('/*');
+    setManageDns(tunnel.config_src === 'cloudflare');
+    setSkipTLSVerify(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, app]);
 
   const submit = async () => {
     setBusy(true);
@@ -550,11 +628,14 @@ function PublishAppModal({
         path,
         manage_dns: manageDns,
         proxied: true,
+        // An explicit empty object clears a previously saved option, which is
+        // what unchecking the box has to do.
+        ...(skipTLSVerify ? { origin_request: { noTLSVerify: true } } : { origin_request: {} }),
       };
-      const app = await tunnelsApi.createApp(tunnel.id, payload);
+      const saved = app ? await appsApi.update(app.id, payload) : await tunnelsApi.createApp(tunnel.id, payload);
       toast.push(
-        app.sync_status === 'synced' ? 'success' : 'info',
-        app.sync_status === 'synced' ? `${app.hostname} is live` : `${app.hostname} saved: ${app.last_error}`,
+        saved.sync_status === 'synced' ? 'success' : 'info',
+        saved.sync_status === 'synced' ? `${saved.hostname} is live` : `${saved.hostname} saved: ${saved.last_error}`,
       );
       onDone();
     } catch (err) {
@@ -569,15 +650,19 @@ function PublishAppModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Publish an app"
-      description="Pick a hostname and the origin the tunnel should reach."
+      title={app ? 'Edit app' : 'Publish an app'}
+      description={
+        app
+          ? 'Change the hostname or the origin. Saving rewrites the ingress rule and the DNS record.'
+          : 'Pick a hostname and the origin the tunnel should reach.'
+      }
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
             Cancel
           </button>
           <button className="btn-primary" disabled={busy || !subdomain || !domain} onClick={() => void submit()}>
-            {busy && <Spinner className="h-4 w-4" />} Publish
+            {busy && <Spinner className="h-4 w-4" />} {app ? 'Save changes' : 'Publish'}
           </button>
         </>
       }
@@ -605,13 +690,58 @@ function PublishAppModal({
         label="Service URL"
         hint={
           tunnel.location === 'local'
-            ? 'Reachable from the connector container. host.docker.internal = this Docker host; a container on the panel network is reachable by its name.'
+            ? 'Reached from the connector container, not from this browser. localhost would be the connector itself.'
             : 'Reachable from the device running the connector, not from this panel.'
         }
         error={fields.service_url}
       >
         <input className="field font-mono text-xs" value={serviceUrl} onChange={(e) => setServiceUrl(e.target.value)} />
       </Field>
+      {tunnel.location === 'local' && (
+        <div className="rounded-lg border border-surface-700 bg-surface-950/50 p-3 text-xs text-slate-400">
+          <p className="font-medium text-slate-300">What to put here</p>
+          <ul className="mt-1 space-y-0.5">
+            <li>
+              <code className="font-mono text-slate-300">http://host.docker.internal:8080</code> — a process on this
+              server, or a container whose port is published on the host
+            </li>
+            <li>
+              <code className="font-mono text-slate-300">http://my-container:3000</code> — a container attached to the{' '}
+              <code className="font-mono text-slate-300">cfmt-panel</code> network, by container name and internal port
+            </li>
+            <li>
+              <code className="font-mono text-slate-300">http://192.168.0.103</code> — another device on the LAN; the
+              connector container can reach it directly, no extra network needed
+            </li>
+            <li>
+              <code className="font-mono text-slate-300">https://localhost:8006</code> — only when that host is
+              genuinely reachable from inside the connector container
+            </li>
+          </ul>
+          <p className="mt-1.5 text-slate-500">
+            A container on a different Docker network is not reachable by name; connect it to{' '}
+            <code className="font-mono">cfmt-panel</code> or use its published host port via{' '}
+            <code className="font-mono">host.docker.internal</code>.
+          </p>
+        </div>
+      )}
+      {serviceUrl.trim().toLowerCase().startsWith('https://') && (
+        <label className="flex items-start gap-2 text-sm text-slate-300">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={skipTLSVerify}
+            onChange={(e) => setSkipTLSVerify(e.target.checked)}
+          />
+          <span>
+            Skip TLS verification
+            <span className="block text-xs text-slate-500">
+              Needed when the origin uses a self-signed certificate or one issued for a different name — common for a
+              LAN device reached by IP.
+            </span>
+          </span>
+        </label>
+      )}
       <Field label="Path" hint="Match only a sub-path, e.g. /api/*">
         <input className="field font-mono text-xs" value={path} onChange={(e) => setPath(e.target.value)} />
       </Field>

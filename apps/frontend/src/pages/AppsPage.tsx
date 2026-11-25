@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Globe2, RefreshCw } from 'lucide-react';
 import { apiMessage } from '../api/client';
-import { appsApi } from '../api/endpoints';
+import { accountsApi, appsApi, tunnelsApi } from '../api/endpoints';
 import { Badge, EmptyState, ErrorBox, PageHeader, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import type { PublishedApp } from '../types';
@@ -11,6 +11,7 @@ export default function AppsPage() {
   const toast = useToast();
   const [apps, setApps] = useState<PublishedApp[] | null>(null);
   const [error, setError] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -24,6 +25,39 @@ export default function AppsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // A local reload cannot discover hostnames that only exist in Cloudflare, which
+  // is why "Refresh" used to look like it did nothing after an import. This pulls
+  // each account's remote ingress into the panel first, then reloads.
+  const syncAll = async () => {
+    setSyncing(true);
+    try {
+      const accounts = await accountsApi.list();
+      const usable = accounts.filter((a) => a.credential === 'api');
+      if (usable.length === 0) {
+        toast.push('error', 'No account with an API token yet, so there is nothing to import.');
+        return;
+      }
+      let created = 0;
+      let updated = 0;
+      for (const account of usable) {
+        const res = await tunnelsApi.sync(account.id);
+        created += res.result.apps_created;
+        updated += res.result.apps_updated;
+      }
+      await load();
+      toast.push(
+        'success',
+        created + updated === 0
+          ? 'Cloudflare has no new hostnames for these accounts.'
+          : `Imported ${created} new hostname(s), refreshed ${updated}.`,
+      );
+    } catch (err) {
+      toast.push('error', apiMessage(err));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const retry = async (app: PublishedApp) => {
     try {
@@ -50,8 +84,8 @@ export default function AppsPage() {
         title="Published apps"
         description="Every hostname across your tunnels, with its Cloudflare sync state."
         actions={
-          <button className="btn-ghost" onClick={() => void load()}>
-            <RefreshCw className="h-4 w-4" /> Refresh
+          <button className="btn-ghost" disabled={syncing} onClick={() => void syncAll()}>
+            {syncing ? <Spinner className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />} Sync from Cloudflare
           </button>
         }
       />
@@ -67,7 +101,12 @@ export default function AppsPage() {
           <EmptyState
             icon={<Globe2 className="h-8 w-8" />}
             title="No published apps"
-            description="Open a tunnel and add a hostname to publish it."
+            description="Open a tunnel and add a hostname to publish it, or sync from Cloudflare to import the hostnames that are already configured there."
+            action={
+              <button className="btn-primary" disabled={syncing} onClick={() => void syncAll()}>
+                {syncing ? <Spinner className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />} Sync from Cloudflare
+              </button>
+            }
           />
         </div>
       ) : (
