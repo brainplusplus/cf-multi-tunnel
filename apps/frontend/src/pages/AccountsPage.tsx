@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Cloud, KeyRound, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { apiFields, apiMessage } from '../api/client';
@@ -6,7 +6,7 @@ import { accountsApi } from '../api/endpoints';
 import { Badge, EmptyState, ErrorBox, Field, Modal, PageHeader, Spinner } from '../components/ui';
 import { ApiTokenGuide } from '../components/ApiTokenGuide';
 import { useToast } from '../components/Toast';
-import type { CFAccount } from '../types';
+import type { AccountChoice, CFAccount } from '../types';
 
 export default function AccountsPage() {
   const toast = useToast();
@@ -286,9 +286,48 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
   const [name, setName] = useState('');
   const [token, setToken] = useState('');
   const [accountId, setAccountId] = useState('');
+  const [choices, setChoices] = useState<AccountChoice[] | null>(null);
+  const [probing, setProbing] = useState(false);
+  const [probeError, setProbeError] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [fields, setFields] = useState<Record<string, string>>({});
+  const probeSeq = useRef(0);
+
+  // Probe the token as soon as it looks complete so the account list comes from
+  // Cloudflare instead of the user copying an id out of an error message.
+  useEffect(() => {
+    const trimmed = token.trim();
+    setChoices(null);
+    setProbeError('');
+    setAccountId('');
+    if (trimmed.length < 20) {
+      setProbing(false);
+      return;
+    }
+
+    const seq = ++probeSeq.current;
+    setProbing(true);
+    const timer = setTimeout(() => {
+      accountsApi
+        .probe(trimmed)
+        .then((list) => {
+          if (probeSeq.current !== seq) return;
+          setChoices(list);
+          // A single account is not a choice; preselect it.
+          if (list.length === 1) setAccountId(list[0].id);
+        })
+        .catch((err) => {
+          if (probeSeq.current === seq) setProbeError(apiMessage(err));
+        })
+        .finally(() => {
+          if (probeSeq.current === seq) setProbing(false);
+        });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [token]);
+
+  const multiple = (choices?.length ?? 0) > 1;
 
   const submit = async () => {
     setBusy(true);
@@ -307,6 +346,7 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
       setName('');
       setToken('');
       setAccountId('');
+      setChoices(null);
       onDone();
     } catch (err) {
       setError(apiMessage(err));
@@ -328,7 +368,11 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
           <button className="btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn-primary" disabled={busy || !token} onClick={() => void submit()}>
+          <button
+            className="btn-primary"
+            disabled={busy || !token || (multiple && !accountId)}
+            onClick={() => void submit()}
+          >
             {busy && <Spinner className="h-4 w-4" />} Add account
           </button>
         </>
@@ -347,9 +391,52 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
           autoComplete="off"
         />
       </Field>
-      <Field label="Account ID" hint="Only needed when the token can access more than one account." error={fields.account_id}>
-        <input className="field font-mono text-xs" value={accountId} onChange={(e) => setAccountId(e.target.value)} />
-      </Field>
+
+      {multiple ? (
+        <Field
+          label="Cloudflare account"
+          hint="This token can see more than one account. Pick the one to manage."
+          error={fields.account_id}
+        >
+          <select className="field" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <option value="">Select an account</option>
+            {choices?.map((c) => (
+              <option key={c.id} value={c.id} disabled={c.already_added}>
+                {c.name}
+                {c.already_added ? ' — already added' : ` · ${c.id}`}
+              </option>
+            ))}
+          </select>
+        </Field>
+      ) : choices?.length === 1 ? (
+        <Field label="Cloudflare account" hint="Detected from the token.">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-surface-700 bg-surface-950/50 px-3 py-2 text-xs">
+            <span className="font-medium text-slate-200">{choices[0].name}</span>
+            <code className="font-mono text-[11px] text-slate-500">{choices[0].id}</code>
+          </div>
+        </Field>
+      ) : (
+        <Field
+          label="Account ID"
+          hint={
+            probing
+              ? 'Checking the token…'
+              : probeError || 'Paste the token above; the account list appears here once it verifies.'
+          }
+          error={fields.account_id}
+        >
+          <div className="flex items-center gap-2">
+            <input
+              className="field font-mono text-xs"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              placeholder="Filled automatically when the token verifies"
+            />
+            {probing && <Spinner className="h-4 w-4 shrink-0 text-slate-500" />}
+          </div>
+        </Field>
+      )}
+
       <div className="rounded-lg border border-surface-700 bg-surface-950/50 p-3 text-xs text-slate-400">
         <p className="font-medium text-slate-300">Required permissions — two policies</p>
         <ul className="mt-1 list-inside list-disc space-y-0.5">

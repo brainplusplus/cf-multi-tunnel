@@ -80,6 +80,7 @@ func Setup(e *echo.Echo, dbConn *gorm.DB, cfg *config.Config, enc *cryptox.Ciphe
 	protected.GET("/cf-accounts", accountH.List)
 	protected.GET("/cf-accounts/:id", accountH.Get)
 	protected.POST("/cf-accounts", accountH.Create)
+	protected.POST("/cf-accounts/probe", accountH.ProbeToken)
 	protected.POST("/cf-accounts/import-tunnel", accountH.ImportTunnel)
 	protected.PATCH("/cf-accounts/:id", accountH.Rename)
 	protected.POST("/cf-accounts/:id/attach-token", accountH.AttachToken)

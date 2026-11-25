@@ -173,9 +173,19 @@ Ringkasnya, yang dipakai panel:
 | Zone | Zone · Read | cari zone pemilik hostname |
 | Zone | DNS · Edit | buat/ubah CNAME ke tunnel |
 
-Account ID opsional — panel membacanya dari token. Isi hanya kalau satu token bisa
-melihat beberapa akun; nilainya ada di URL dashboard
-(`dash.cloudflare.com/<account-id>`) atau sidebar Overview sebuah domain.
+**Pilih akun lewat dropdown, bukan mengetik ID.** Begitu token ditempel, panel
+memverifikasinya (`POST /api/cf-accounts/probe`, tidak menyimpan apa pun) dan
+mengambil daftar akun yang bisa dilihat token itu:
+
+- token hanya melihat **satu** akun → akun tersebut langsung terpilih, ditampilkan
+  sebagai nama + ID (tidak ada yang perlu dipilih)
+- token melihat **beberapa** akun → muncul dropdown berisi nama akun; akun yang sudah
+  ditambahkan dengan API token ditandai *already added* dan tidak bisa dipilih lagi
+- token ditolak / kurang izin → pesan errornya muncul di bawah field, dan ID masih
+  bisa diisi manual sebagai fallback
+
+Account ID manual hanya diperlukan kalau Anda tahu persis ID-nya; nilainya ada di URL
+dashboard (`dash.cloudflare.com/<account-id>`) atau sidebar Overview sebuah domain.
 
 Panduan langkah demi langkah yang sama (termasuk tabel per-policy dan daftar
 "jangan dicentang") juga tersedia langsung di dalam modal

@@ -32,6 +32,14 @@ export interface CFAccount {
   created_at: string;
 }
 
+// One Cloudflare account a token can reach, returned by the dry-run probe that
+// powers the account combobox in the add-account form.
+export interface AccountChoice {
+  id: string;
+  name: string;
+  already_added: boolean;
+}
+
 export interface CFZone {
   id: string;
   cf_account_id: string;

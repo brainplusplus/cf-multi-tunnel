@@ -64,6 +64,23 @@ func IsNotFound(err error) bool {
 	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }
 
+// IsMalformedToken reports the "6003: Invalid request headers" case Cloudflare
+// returns when the Authorization header does not hold a token at all (typo,
+// truncated paste, or extra characters). It is a user mistake, not an outage, so
+// it deserves a fixable message instead of a raw API error.
+func IsMalformedToken(err error) bool {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	for _, item := range apiErr.Errors {
+		if item.Code == 6003 || item.Code == 9103 {
+			return true
+		}
+	}
+	return false
+}
+
 type Client struct {
 	Token   string
 	BaseURL string

@@ -43,6 +43,23 @@ func (h *AccountHandler) Create(c echo.Context) error {
 	return ok(c, http.StatusCreated, account)
 }
 
+// ProbeToken is a dry run of Create: it verifies the token and returns the
+// accounts it can reach so the form can render a combobox instead of asking for a
+// raw account id.
+func (h *AccountHandler) ProbeToken(c echo.Context) error {
+	var in struct {
+		APIToken string `json:"api_token"`
+	}
+	if err := c.Bind(&in); err != nil {
+		return fail(c, services.BadRequest("invalid request body"))
+	}
+	accounts, err := h.accounts.ProbeToken(c.Request().Context(), middleware.Caller(c), in.APIToken)
+	if err != nil {
+		return fail(c, err)
+	}
+	return ok(c, http.StatusOK, map[string]any{"accounts": accounts})
+}
+
 func (h *AccountHandler) ImportTunnel(c echo.Context) error {
 	var in services.ImportTunnelInput
 	if err := c.Bind(&in); err != nil {

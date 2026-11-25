@@ -126,7 +126,7 @@ func (s *AccountService) CreateWithToken(ctx context.Context, caller Caller, in 
 			ids = append(ids, acc.ID+" ("+acc.Name+")")
 		}
 		return nil, NewError(409, "account_selection_required",
-			"this token can access multiple accounts, choose one: "+strings.Join(ids, ", "))
+			"this token can access multiple accounts; choose one in the Cloudflare account list (account_id): "+strings.Join(ids, ", "))
 	}
 
 	// Same owner + same Cloudflare account: this is an upsert, not a duplicate.
@@ -195,6 +195,55 @@ func (s *AccountService) CreateWithToken(ctx context.Context, caller Caller, in 
 		Entity: "cf_account", EntityID: account.ID, Detail: account.AccountID,
 	})
 	return account, nil
+}
+
+// AccountChoice is one Cloudflare account a token can reach. The add-account
+// form turns this into a combobox, so the user picks a name instead of copying a
+// 32-character id out of an error message.
+type AccountChoice struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Already bool   `json:"already_added"`
+}
+
+// ProbeToken verifies a token and lists the accounts it can reach without
+// persisting anything. It exists purely so the form can offer a real choice
+// before the user submits.
+func (s *AccountService) ProbeToken(ctx context.Context, caller Caller, apiToken string) ([]AccountChoice, error) {
+	token := strings.TrimSpace(apiToken)
+	if token == "" {
+		return nil, Validation(map[string]string{"api_token": "required"})
+	}
+
+	client := cloudflare.New(token)
+	client.BaseURL = s.cf.cfg.CFAPIBaseURL
+
+	status, err := client.VerifyToken(ctx)
+	if err != nil {
+		return nil, MapUpstream(err)
+	}
+	if status.Status != "active" {
+		return nil, BadRequest("the API token is " + status.Status + ", not active")
+	}
+
+	accounts, err := client.ListAccounts(ctx)
+	if err != nil {
+		return nil, MapUpstream(err)
+	}
+	if len(accounts) == 0 {
+		return nil, BadRequest("this token cannot read any Cloudflare account; add Account: Account Settings: Read")
+	}
+
+	out := make([]AccountChoice, 0, len(accounts))
+	for _, acc := range accounts {
+		choice := AccountChoice{ID: acc.ID, Name: acc.Name}
+		// A token_import row is upgraded in place, so it is not "already added".
+		if existing, err := s.repo.FindByOwnerAndAccountID(ctx, caller.ID, acc.ID); err == nil && existing.Credential == "api" {
+			choice.Already = true
+		}
+		out = append(out, choice)
+	}
+	return out, nil
 }
 
 type ImportTunnelInput struct {

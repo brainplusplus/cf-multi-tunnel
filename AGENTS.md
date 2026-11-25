@@ -83,6 +83,16 @@ the LAN IP.
 `SetTunnelReconciler` wires `TunnelService` in after construction (avoids an import
 cycle); a nil reconciler is valid.
 
+**Account selection comes from the token, not from the user's memory.**
+`AccountService.ProbeToken` (`POST /api/cf-accounts/probe`) verifies the token and
+returns every account it can reach, flagging rows the caller already manages with an
+API token (`already_added`). It writes nothing. The add-account form debounces on the
+token and renders a combobox from that list, preselecting the account when there is
+exactly one, so a multi-account token never turns into a 409 listing raw ids. A
+`token_import` row is NOT flagged — it is the upgrade path. Keep `ProbeToken` and
+`CreateWithToken` in agreement: probe decides what the form offers, create decides
+what is stored.
+
 **Secrets never leave the server.**
 API tokens and tunnel secrets are AES-256-GCM encrypted (`pkg/cryptox`) with
 `ENCRYPTION_KEY` or a generated `encryption.key` in the data dir. API responses expose

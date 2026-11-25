@@ -51,6 +51,10 @@ func MapUpstream(err error) *AppError {
 	if errors.As(err, &appErr) {
 		return appErr
 	}
+	if cloudflare.IsMalformedToken(err) {
+		return NewError(422, "cf_token_malformed",
+			"Cloudflare rejected the token format. Paste an API token from My Profile → API Tokens — not the Global API Key and not a tunnel token.")
+	}
 	if cloudflare.IsPermission(err) {
 		return NewError(422, "cf_permission_denied",
 			"Cloudflare rejected the request: the API token is missing a required permission (Account: Cloudflare Tunnel Edit, Zone: DNS Edit, Zone: Zone Read)")

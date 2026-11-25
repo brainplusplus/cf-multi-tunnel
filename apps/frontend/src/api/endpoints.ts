@@ -1,5 +1,6 @@
 import client from './client';
 import type {
+  AccountChoice,
   AuditLog,
   AuthResult,
   CFAccount,
@@ -35,6 +36,12 @@ export const accountsApi = {
   get: (id: string) => client.get<CFAccount>(`/api/cf-accounts/${id}`).then((r) => r.data),
   create: (payload: { name?: string; api_token: string; account_id?: string }) =>
     client.post<CFAccount>('/api/cf-accounts', payload).then((r) => r.data),
+  // Dry run: verifies the token and lists the accounts it can reach, so the form
+  // can offer a combobox instead of a raw account id.
+  probe: (apiToken: string) =>
+    client
+      .post<{ accounts: AccountChoice[] }>('/api/cf-accounts/probe', { api_token: apiToken })
+      .then((r) => r.data.accounts),
   importTunnel: (payload: {
     name?: string;
     tunnel_token: string;
