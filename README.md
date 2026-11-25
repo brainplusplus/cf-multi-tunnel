@@ -116,9 +116,9 @@ policy**. Alurnya:
    | `cloudflare tunnel` | Cloudflare Tunnel | **Edit** |
    | `account settings` | Account Settings | **Read** |
 
-5. **Policy 2 — Zone.** Klik `+ Add new policy` lagi, set tipe **Zone**, lalu
-   `Include → Specific zone` → pilih domain tujuan (tambah satu policy per domain,
-   atau pakai `All zones from an account`). Centang:
+5. **Policy 2 — Zone.** Editor sudah menyiapkan satu policy bernama
+   **Edit Zone policy**; pakai itu (kalau tidak ada, klik `+ Add new policy` dan set
+   tipe **Zone**). Lalu `Include → Specific zone` → pilih domain tujuan. Centang:
 
    | Cari | Permission group | Centang |
    |---|---|---|
@@ -128,14 +128,39 @@ policy**. Alurnya:
 6. **Token expiration**: pilih sesuai kebijakan Anda. `No expiration` membuat panel
    terus jalan sampai token di-roll; tanggal tetap berarti harus diingat untuk diganti.
    **Client IP address filtering** biarkan kosong kecuali panel punya IP keluar tetap.
-7. **Continue to summary → Create Token**, lalu copy (hanya ditampilkan sekali).
+7. **Continue to summary**, lalu **cek summary sebelum** klik Create Token. Isinya
+   harus memuat tepat empat baris ini:
+
+   ```
+   Cloudflare Tunnel: Edit
+   Account Settings: Read
+   Zone: Read
+   DNS: Edit
+   ```
+
+   Tidak ada baris **Cloudflare Tunnel** = policy Account belum dibuat. Kalau sudah
+   benar, baru Create Token dan copy (hanya ditampilkan sekali).
+
+8. **Cek juga baris scope di atas tiap daftar izin.** Harus berbunyi
+   `All accounts` → seharusnya `Specific account`, dan
+   `All zones across all accounts` → seharusnya `Specific zone`. Kalau masih "All …",
+   token tetap jalan tapi memberi `DNS: Edit` ke **semua** domain Anda — balik ke
+   masing-masing policy dan ganti Include-nya.
 
 Jangan dicentang (sering salah klik):
 
+- **`All zones across all accounts` / `All accounts`** — ini opsi Include default, jadi
+  mudah terlewat. Cakupannya seluruh akun dan seluruh domain.
+- **Hanya policy Zone** — editor memang membuka dengan satu Zone policy, dan mudah
+  berhenti di situ. Tanpa policy Account, panel tidak bisa membaca daftar tunnel
+  sama sekali.
 - **Apps** (grup *Account & Billing*) — deprecated, tidak ada hubungannya dengan tunnel.
 - **Cloudflare One Connector: cloudflared** — mengatur connector yang dikelola
   Cloudflare Zero Trust, bukan konfigurasi tunnel. Panel menjalankan cloudflared
   sendiri, jadi tidak perlu.
+- **Permission Zone lain** — Zone Settings, Access, Zone WAF, Custom Assets, Zone
+  Versioning, DNS Settings, dan sejenisnya tidak pernah dipanggil panel. Setiap
+  `Edit` tambahan hanya memperbesar dampak kalau token bocor.
 - Izin **Account** di dalam **Zone policy** — tiap policy hanya satu scope, jadi
   editor menyembunyikannya. Itu sebabnya perlu dua policy.
 
@@ -144,7 +169,7 @@ Ringkasnya, yang dipakai panel:
 | Policy | Permission | Dipakai untuk |
 |---|---|---|
 | Account | Cloudflare Tunnel · Edit | list/read/tulis ingress tunnel |
-| Account | Account Settings · Read | verifikasi token & nama akun |
+| Account | Account Settings · Read | list akun & verifikasi token |
 | Zone | Zone · Read | cari zone pemilik hostname |
 | Zone | DNS · Edit | buat/ubah CNAME ke tunnel |
 
