@@ -1,0 +1,26 @@
+# The frontend is built here and copied into the proxy image, so the runtime
+# image only needs the static bundle and the Go binary.
+FROM oven/bun:1-alpine AS frontend
+WORKDIR /src
+COPY apps/frontend/package.json apps/frontend/bun.lock* ./
+RUN bun install --frozen-lockfile || bun install
+COPY apps/frontend/ ./
+RUN bun run build
+
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+COPY apps/reverse-proxy/go.mod apps/reverse-proxy/go.sum* ./
+RUN go mod download
+COPY apps/reverse-proxy/ ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/reverse-proxy .
+
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates tzdata
+WORKDIR /app
+COPY --from=build /out/reverse-proxy /app/reverse-proxy
+COPY --from=frontend /src/dist /app/static
+ENV PORT=7777 \
+    STATIC_DIR=/app/static \
+    BACKEND_URL=http://backend:3001
+EXPOSE 7777
+ENTRYPOINT ["/app/reverse-proxy"]

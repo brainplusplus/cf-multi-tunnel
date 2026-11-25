@@ -1,0 +1,16 @@
+node_modules/
+dist/
+bin/
+data/
+*.exe
+*.log
+*.tsbuildinfo
+.env
+.env.local
+.env.docker
+.DS_Store
+opencode-context.md
+.opencode-context.md
+.opencode-jce/
+coverage/
+backups/

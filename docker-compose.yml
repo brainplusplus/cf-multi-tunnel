@@ -1,0 +1,79 @@
+name: cf-multi-tunnel
+
+services:
+  backend:
+    build:
+      context: ./apps/backend
+    restart: unless-stopped
+    expose:
+      - '3001'
+    volumes:
+      # Persistent state. `docker compose up -d --build` and `down` keep this
+      # volume; only `down -v` deletes it. It contains app.db (+ WAL),
+      # .jwt_secret and encryption.key — losing it loses every CF credential.
+      - cfmt_data:/app/data
+      # Required to spawn one cloudflared container per tunnel.
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - APP_NAME=${APP_NAME:-CF Tunnel Panel}
+      - PORT=3001
+      - PUBLIC_URL=${PUBLIC_URL:-http://localhost:7777}
+      - DATA_DIR=/app/data
+      - DB_PATH=/app/data/app.db
+      # Empty means "generate once and persist inside the volume".
+      - JWT_SECRET=${JWT_SECRET:-}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - JWT_ACCESS_TOKEN_EXPIRATION_SECONDS=${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:-1800}
+      - JWT_REFRESH_TOKEN_EXPIRATION_DAYS=${JWT_REFRESH_TOKEN_EXPIRATION_DAYS:-7}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      # Simple default so a first start works. The backend logs a warning while
+      # this is still in use; change it in the UI once the panel is reachable
+      # from the internet.
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - CONNECTOR_MODE=${CONNECTOR_MODE:-docker}
+      - CLOUDFLARED_IMAGE=${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}
+      - DOCKER_BIN=docker
+      # Connectors join the panel network so a tunnel can expose this dashboard.
+      - CONNECTOR_DOCKER_NETWORK=cfmt-panel
+      - PANEL_INTERNAL_URL=http://reverse-proxy:7777
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    networks:
+      - panel
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://localhost:3001/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  reverse-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.proxy
+    restart: unless-stopped
+    ports:
+      - '${PANEL_PORT:-7777}:7777'
+    environment:
+      - PORT=7777
+      - BACKEND_URL=http://backend:3001
+      - STATIC_DIR=/app/static
+    depends_on:
+      - backend
+    networks:
+      - panel
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:7777/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  panel:
+    # Fixed name so CONNECTOR_DOCKER_NETWORK does not depend on the compose
+    # project name.
+    name: cfmt-panel
+
+volumes:
+  cfmt_data:
+    name: cfmt-data

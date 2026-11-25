@@ -1,0 +1,19 @@
+# Dockerfile.proxy builds from the repo root, so this file decides what the
+# builder receives. Without it, 120 MB of node_modules is uploaded on every
+# build, and .env (with secrets) would sit in the build context.
+.git
+.gitignore
+**/node_modules
+**/dist
+**/bin
+**/data
+**/*.log
+**/*.err
+**/*.exe
+backups
+.env
+.env.local
+.env.*
+!.env.example
+.opencode-context.md
+.opencode-jce
