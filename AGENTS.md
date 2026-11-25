@@ -97,6 +97,12 @@ reset on restart, which is also how to clear a lockout while testing.
 
 ## Gotchas
 
+- **The SPA needs its provider tree.** `src/main.tsx` must wrap `<App />` in
+  `<BrowserRouter>` → `<ToastProvider>` → `<AuthProvider>`. Without `BrowserRouter`,
+  `<Routes>` throws "useRoutes() may be used only in the context of a `<Router>`
+  component"; without the two providers every page throws on `useAuth()`/`useToast()`.
+  The failure mode is a **blank page with one console error** while `/api` keeps
+  working, so always open the built UI in a browser, not just curl.
 - Tailwind 4: component classes in `src/index.css` must repeat utilities; `@apply btn`
   fails with "unknown utility class".
 - `lucide-react` here has no `Docker` icon — use `Container`.
