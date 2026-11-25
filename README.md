@@ -82,21 +82,47 @@ atau nama container di network `cfmt-panel`.
 **Panel exposure** — admin bisa mempublikasikan dashboard ini sendiri lewat tunnel
 (**Settings → Panel exposure**). Formnya mengikuti alur yang sama: pilih **akun
 (opsional)** untuk mempersempit daftar, pilih **tunnel**, lalu **subdomain + domain**.
-Service URL tidak perlu diisi:
+Service URL tidak diisi sama sekali; panel selalu memakai `PANEL_INTERNAL_URL`
+(mis. `http://reverse-proxy:7777`) karena container connector menjangkau dashboard
+lewat network Docker `cfmt-panel`.
 
-- tunnel `local` → `PANEL_INTERNAL_URL` (mis. `http://reverse-proxy:7777`) dipakai otomatis
-- tunnel `remote` → diisi otomatis dari `PUBLIC_URL` (mis. `http://192.168.0.100:7777`)
-  dan tetap bisa diubah kalau perangkat itu menjangkau panel lewat alamat lain
-
-Panel menolak service URL yang memutar balik ke hostname yang sedang dipublikasikan,
-atau ke `PUBLIC_URL` bila itu berupa nama DNS. IP LAN tidak pernah dianggap loop,
-jadi `PUBLIC_URL=http://192.168.0.100:7777` boleh dipakai ulang.
+Hanya tunnel yang terpasang **di server ini** (`location=local`) yang bisa dipilih.
+Connector di perangkat lain tidak bisa me-resolve `reverse-proxy`, dan mengarahkannya
+ke `PUBLIC_URL` akan memutar balik lewat tunnel yang sedang dibuat — jadi backend
+menolaknya dengan 422 pada `tunnel_id`. Exposure lama yang masih menempel di tunnel
+remote tetap ditampilkan di Settings beserta peringatan, supaya tidak hilang diam-diam.
 
 Exposure disimpan sebagai published app dengan `kind=panel`, jadi hostname-nya
 **otomatis ikut masuk** ke ingress tunnel tersebut dan muncul di halaman
 **Published apps** (dengan badge `panel`). Baris itu tidak bisa diubah/dimatikan/
 dihapus dari daftar app — semuanya lewat Settings. Menghapus tunnel atau akun yang
 sedang memuat exposure juga ditolak sampai exposure dipindah/dihapus dulu.
+
+**Bahasa** — seluruh UI punya teks Indonesia dan Inggris; default Indonesia, dan
+tombol ID/EN di sidebar menyimpan pilihan di `localStorage.language`. Halaman baru
+wajib menambah `src/locales/<module>.json` dan memakai `useTranslation('<module>')`.
+
+**Impersonation** — admin bisa memakai panel sebagai pengguna lain dari halaman
+**Pengguna** (tombol *Masuk sebagai*). Sesi itu memakai token berumur pendek dengan
+peran pengguna tersebut, bukan sesi admin yang disegarkan; menekan *Keluar dari mode
+lihat* mengembalikan sesi admin semula. Kedua arah dicatat di audit
+(`user.impersonate_start` menyebut admin asalnya, `user.impersonate_end`).
+
+**DNS** — halaman **DNS** mengelola record domain yang zone-nya sudah tersinkron.
+Pilih **akun** (opsional) lalu **domain**; tombol **Sinkron** menyegarkan daftar zone
+dari setiap akun yang punya API token, lalu daftar record dimuat ulang. Record selalu
+dibaca **langsung dari Cloudflare** (tidak ada cache record lokal), jadi yang terlihat
+di panel adalah yang benar-benar aktif.
+
+Semua tipe umum bisa dibuat/diubah/dihapus: `A`, `AAAA`, `CNAME`, `TXT`, `MX`, `NS`,
+`SRV`, `CAA`. Form mengikuti tipe: `A`/`AAAA` meminta alamat IP, `CNAME`/`NS` hostname,
+`MX`/`SRV` prioritas, `SRV` service + protokol + port + weight, `CAA` flags/tag/value,
+dan hanya `A`/`AAAA`/`CNAME` yang bisa **Proxied**.
+
+CNAME yang menunjuk ke `<tunnel-id>.cfargotunnel.com` ditampilkan bertipe **Tunnel**.
+Kalau record itu dipakai **published app**, barisnya **terkunci** (ikon gembok): ubah
+atau hapus dari halaman tunnel, supaya aturan ingress dan DNS tidak berbeda. Sync tidak
+pernah menghapus record atau zone yang sudah ada.
 
 ## Permission token Cloudflare
 

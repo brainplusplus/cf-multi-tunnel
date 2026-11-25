@@ -4,9 +4,11 @@ import { apiFields, apiMessage } from '../api/client';
 import { authApi } from '../api/endpoints';
 import { ErrorBox, Field, PageHeader, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
+import { useTranslation } from '../i18n/useTranslation';
 import { useAuth } from '../store/auth-context';
 
 export default function ChangePasswordPage() {
+  const { t } = useTranslation('account');
   const { user } = useAuth();
   const toast = useToast();
   const [current, setCurrent] = useState('');
@@ -21,13 +23,13 @@ export default function ChangePasswordPage() {
     setError('');
     setFields({});
     if (next !== confirm) {
-      setFields({ confirm_password: 'does not match' });
+      setFields({ confirm_password: t('mismatch') });
       return;
     }
     setBusy(true);
     try {
       await authApi.changePassword(current, next);
-      toast.push('success', 'Password changed. Other sessions keep working until their token expires.');
+      toast.push('success', t('changed'));
       setCurrent('');
       setNext('');
       setConfirm('');
@@ -41,20 +43,22 @@ export default function ChangePasswordPage() {
 
   return (
     <div className="max-w-lg">
-      <PageHeader title="Account" description="Your sign-in details for this panel." />
+      <PageHeader title={t('title')} description={t('description')} />
 
       <div className="card mb-4 p-4">
         <p className="text-sm text-slate-200">{user?.name}</p>
         <p className="text-xs text-slate-500">{user?.email}</p>
-        <p className="mt-1 text-[11px] uppercase tracking-wider text-slate-500">role: {user?.role}</p>
+        <p className="mt-1 text-[11px] uppercase tracking-wider text-slate-500">
+          {t('role', { role: user?.role ?? '' })}
+        </p>
       </div>
 
       <form onSubmit={submit} className="card space-y-4 p-5">
         <div className="flex items-center gap-2 text-sm font-semibold text-white">
-          <KeyRound className="h-4 w-4" /> Change password
+          <KeyRound className="h-4 w-4" /> {t('change_password')}
         </div>
         {error && <ErrorBox message={error} />}
-        <Field label="Current password" error={fields.current_password}>
+        <Field label={t('current_password')} error={fields.current_password}>
           <input
             className="field"
             type="password"
@@ -64,7 +68,7 @@ export default function ChangePasswordPage() {
             required
           />
         </Field>
-        <Field label="New password" hint="At least 8 characters." error={fields.new_password}>
+        <Field label={t('new_password')} hint={t('min_length')} error={fields.new_password}>
           <input
             className="field"
             type="password"
@@ -75,7 +79,7 @@ export default function ChangePasswordPage() {
             minLength={8}
           />
         </Field>
-        <Field label="Repeat new password" error={fields.confirm_password}>
+        <Field label={t('confirm_password')} error={fields.confirm_password}>
           <input
             className="field"
             type="password"
@@ -86,7 +90,7 @@ export default function ChangePasswordPage() {
           />
         </Field>
         <button type="submit" className="btn-primary" disabled={busy}>
-          {busy && <Spinner className="h-4 w-4" />} Update password
+          {busy && <Spinner className="h-4 w-4" />} {t('submit')}
         </button>
       </form>
     </div>

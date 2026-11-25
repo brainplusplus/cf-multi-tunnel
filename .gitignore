@@ -11,6 +11,10 @@ data/
 .DS_Store
 opencode-context.md
 .opencode-context.md
+.opencode-context-archive.md
 .opencode-jce/
 coverage/
 backups/
+
+# JCE context index runtime state
+.opencode-jce/context/

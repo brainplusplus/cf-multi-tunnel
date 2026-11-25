@@ -59,7 +59,40 @@ func (h *AuthHandler) Me(c echo.Context) error {
 	if err != nil {
 		return fail(c, err)
 	}
-	return ok(c, http.StatusOK, user.Public())
+	pub := user.Public()
+	return ok(c, http.StatusOK, map[string]any{
+		"id": pub.ID, "email": pub.Email, "name": pub.Name, "role": pub.Role,
+		"is_active": pub.IsActive, "created_at": pub.CreatedAt,
+		// Lets the SPA render the "viewing as" banner after a reload, when the
+		// impersonation token is the only thing in localStorage.
+		"impersonated_by": caller.ImpersonatedBy,
+	})
+}
+
+type impersonateRequest struct {
+	UserID string `json:"user_id"`
+}
+
+// Impersonate handles POST /api/auth/impersonate. Admin only: the service
+// re-checks the role, so this route cannot be widened by a middleware mistake.
+func (h *AuthHandler) Impersonate(c echo.Context) error {
+	var req impersonateRequest
+	if err := c.Bind(&req); err != nil {
+		return fail(c, services.BadRequest("invalid request body"))
+	}
+	result, err := h.auth.Impersonate(c.Request().Context(), middleware.Caller(c), req.UserID, clientIP(c))
+	if err != nil {
+		return fail(c, err)
+	}
+	return ok(c, http.StatusOK, result)
+}
+
+// ExitImpersonation only writes the audit trail. The browser restores the
+// admin's own token, so there is no server-side session to end.
+func (h *AuthHandler) ExitImpersonation(c echo.Context) error {
+	caller := middleware.Caller(c)
+	h.auth.EndImpersonation(c.Request().Context(), caller, caller.ImpersonatedBy, clientIP(c))
+	return ok(c, http.StatusOK, map[string]bool{"ok": true})
 }
 
 type changePasswordRequest struct {

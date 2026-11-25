@@ -1,0 +1,173 @@
+{
+  "back": { "id": "Tunnel", "en": "Tunnels" },
+  "sync": { "id": "Sinkron", "en": "Sync" },
+  "sync_none": {
+    "id": "Cloudflare tidak punya hostname baru untuk akun ini.",
+    "en": "Cloudflare has no new hostnames for this account."
+  },
+  "sync_done": {
+    "id": "Mengimpor {{created}} hostname baru, memperbarui {{updated}}.",
+    "en": "Imported {{created}} new hostname(s), refreshed {{updated}}."
+  },
+  "token": { "id": "Token", "en": "Token" },
+  "logs": { "id": "Log", "en": "Logs" },
+  "stop": { "id": "Hentikan", "en": "Stop" },
+  "start": { "id": "Jalankan", "en": "Start" },
+  "publish_app": { "id": "Publikasikan app", "en": "Publish app" },
+  "delete_confirm": {
+    "id": "Hapus tunnel {{name}}? Tunnel ini juga dihapus dari Cloudflare.",
+    "en": "Delete tunnel {{name}}? It is also removed from Cloudflare."
+  },
+  "deleted": { "id": "Tunnel dihapus", "en": "Tunnel deleted" },
+  "app_deleted": { "id": "Aplikasi publik dihapus", "en": "Published app removed" },
+  "app_delete_confirm": { "id": "Hapus {{hostname}}?", "en": "Delete {{hostname}}?" },
+  "tiles": {
+    "placement": { "id": "Penempatan", "en": "Placement" },
+    "status": { "id": "Status", "en": "Status" },
+    "config_source": { "id": "Sumber konfigurasi", "en": "Config source" },
+    "cloudflared": { "id": "cloudflared", "en": "cloudflared" }
+  },
+  "placement": {
+    "this_server": { "id": "server ini", "en": "this server" },
+    "remote_device": { "id": "perangkat lain", "en": "remote device" },
+    "change": { "id": "Ubah penempatan", "en": "Change placement" }
+  },
+  "seen": { "id": "terlihat {{when}}", "en": "seen {{when}}" },
+  "na_here": { "id": "tidak di sini", "en": "n/a here" },
+  "remote_notice": {
+    "id": "Tunnel ini berjalan di {{host}}. Panel mengatur ingress dan DNS lewat API Cloudflare, tetapi tidak bisa menjalankan, menghentikan, atau membaca log connector tersebut — gunakan tombol Token untuk menjalankannya di sana.",
+    "en": "This tunnel runs on {{host}}. The panel manages its ingress and DNS through the Cloudflare API but cannot start, stop or read logs of that connector — use the Token button to run cloudflared there."
+  },
+  "apps": {
+    "title": { "id": "Aplikasi publik", "en": "Published apps" },
+    "count": { "id": "{{count}} hostname", "en": "{{count}} hostname(s)" },
+    "empty_title": { "id": "Belum ada yang dipublikasikan", "en": "Nothing published yet" },
+    "empty_desc": {
+      "id": "Tambahkan hostname dan panel menulis aturan ingress serta CNAME DNS untuk Anda.",
+      "en": "Add a hostname and the panel writes the ingress rule and the DNS CNAME for you."
+    },
+    "managed_in_settings": { "id": "diatur di Pengaturan", "en": "managed in Settings" }
+  },
+  "columns": {
+    "hostname": { "id": "Hostname", "en": "Hostname" },
+    "service": { "id": "Layanan", "en": "Service" },
+    "dns": { "id": "DNS", "en": "DNS" },
+    "sync": { "id": "Sinkron", "en": "Sync" },
+    "actions": { "id": "Aksi", "en": "Actions" }
+  },
+  "dns": {
+    "managed": { "id": "dikelola", "en": "managed" },
+    "pending": { "id": "menunggu", "en": "pending" },
+    "manual": { "id": "manual", "en": "manual" }
+  },
+  "edit_hint": { "id": "Ubah hostname atau origin", "en": "Edit hostname or origin" },
+  "delete_hint": { "id": "Hapus hostname ini", "en": "Delete this hostname" },
+  "modals": {
+    "logs_title": { "id": "Log connector", "en": "Connector logs" },
+    "no_output": { "id": "Tidak ada output", "en": "No output" },
+    "config_title": { "id": "cloudflared config.yml", "en": "cloudflared config.yml" },
+    "config_desc": {
+      "id": "Yang harus dipasang di host connector saat dijalankan di luar panel ini.",
+      "en": "What to place on the connector host when it runs outside this panel."
+    },
+    "token_title": { "id": "Token tunnel", "en": "Tunnel token" },
+    "token_desc": {
+      "id": "Jalankan di host connector: cloudflared tunnel --no-autoupdate run --token <token>",
+      "en": "Run this on the connector host: cloudflared tunnel --no-autoupdate run --token <token>"
+    },
+    "token_warning": {
+      "id": "Siapa pun yang memegang token ini bisa menyambungkan connector ke tunnel. Token hanya ditampilkan kepada pemilik tunnel dan admin.",
+      "en": "Anyone holding this token can connect a connector to the tunnel. It is shown only to the tunnel owner and admins."
+    },
+    "loading": { "id": "memuat…", "en": "loading..." }
+  },
+  "placement_modal": {
+    "title": { "id": "Penempatan tunnel", "en": "Tunnel placement" },
+    "description": {
+      "id": "Memberi tahu panel apakah ia boleh mengendalikan connector di host ini.",
+      "en": "Tells the panel whether it may control the connector on this host."
+    },
+    "this_server_hint": {
+      "id": "Panel menjalankan container dan bisa start/stop.",
+      "en": "Panel runs the container and can start/stop it."
+    },
+    "another_device_hint": {
+      "id": "Panel hanya mengatur ingress dan DNS lewat API.",
+      "en": "Panel only manages ingress and DNS through the API."
+    },
+    "device_label": { "id": "Label perangkat", "en": "Device label" },
+    "device_label_hint": {
+      "id": "Ditampilkan di daftar tunnel agar perangkat mudah dibedakan.",
+      "en": "Shown in the tunnel list so you can tell devices apart."
+    },
+    "remote_warning": {
+      "id": "Menyimpan akan menghentikan dan menghapus container yang berjalan di host ini. Pastikan cloudflared sudah berjalan di perangkat baru sebelum connector lama hilang, atau tunnel akan offline.",
+      "en": "Saving stops and removes the container currently running on this host. Make sure cloudflared is running on the new device before the old connector disappears, or the tunnel will be offline."
+    },
+    "saved": { "id": "Penempatan diperbarui", "en": "Placement updated" }
+  },
+  "app_modal": {
+    "create_title": { "id": "Publikasikan app", "en": "Publish an app" },
+    "edit_title": { "id": "Ubah app", "en": "Edit app" },
+    "create_desc": {
+      "id": "Pilih hostname dan origin yang harus dijangkau tunnel.",
+      "en": "Pick a hostname and the origin the tunnel should reach."
+    },
+    "edit_desc": {
+      "id": "Ubah hostname atau origin. Menyimpan akan menulis ulang aturan ingress dan record DNS.",
+      "en": "Change the hostname or the origin. Saving rewrites the ingress rule and the DNS record."
+    },
+    "submit": { "id": "Publikasikan", "en": "Publish" },
+    "save": { "id": "Simpan perubahan", "en": "Save changes" },
+    "subdomain": { "id": "Subdomain", "en": "Subdomain" },
+    "domain": { "id": "Domain", "en": "Domain" },
+    "no_zone": {
+      "id": "Belum ada zona tersimpan; sinkronkan akun dulu.",
+      "en": "No zone cached; sync the account first."
+    },
+    "service_url": { "id": "Service URL", "en": "Service URL" },
+    "service_local_hint": {
+      "id": "Diakses dari container connector, bukan dari browser ini. localhost berarti connector itu sendiri.",
+      "en": "Reached from the connector container, not from this browser. localhost would be the connector itself."
+    },
+    "service_remote_hint": {
+      "id": "Harus bisa dijangkau dari perangkat yang menjalankan connector, bukan dari panel ini.",
+      "en": "Reachable from the device running the connector, not from this panel."
+    },
+    "what_title": { "id": "Apa yang diisi di sini", "en": "What to put here" },
+    "what_1": {
+      "id": "— proses di server ini, atau container yang port-nya dipublikasikan di host",
+      "en": "— a process on this server, or a container whose port is published on the host"
+    },
+    "what_2": {
+      "id": "— container yang tersambung ke jaringan cfmt-panel, pakai nama container dan port internal",
+      "en": "— a container attached to the cfmt-panel network, by container name and internal port"
+    },
+    "what_3": {
+      "id": "— perangkat lain di LAN; container connector bisa menjangkaunya langsung",
+      "en": "— another device on the LAN; the connector container can reach it directly, no extra network needed"
+    },
+    "what_4": {
+      "id": "— hanya jika host itu benar-benar bisa dijangkau dari dalam container connector",
+      "en": "— only when that host is genuinely reachable from inside the connector container"
+    },
+    "what_note": {
+      "id": "Container di jaringan Docker lain tidak bisa dijangkau lewat nama; sambungkan ke cfmt-panel atau pakai port host yang dipublikasikan lewat host.docker.internal.",
+      "en": "A container on a different Docker network is not reachable by name; connect it to cfmt-panel or use its published host port via host.docker.internal."
+    },
+    "skip_tls": { "id": "Lewati verifikasi TLS", "en": "Skip TLS verification" },
+    "skip_tls_hint": {
+      "id": "Dibutuhkan saat origin memakai sertifikat self-signed atau sertifikat untuk nama lain — umum pada perangkat LAN yang diakses lewat IP.",
+      "en": "Needed when the origin uses a self-signed certificate or one issued for a different name — common for a LAN device reached by IP."
+    },
+    "path": { "id": "Path", "en": "Path" },
+    "path_hint": { "id": "Batasi ke sub-path tertentu, mis. /api/*", "en": "Match only a sub-path, e.g. /api/*" },
+    "dns_auto": { "id": "Buat CNAME DNS otomatis", "en": "Create the DNS CNAME automatically" },
+    "dns_manual_warning": {
+      "id": "Tunnel ini tidak punya konfigurasi remote. App tetap disimpan dan ditulis ke config.yml, tetapi record DNS harus Anda buat sendiri.",
+      "en": "This tunnel has no remote configuration. The app is saved and written into config.yml, but you must create the DNS record yourself."
+    },
+    "saved_live": { "id": "{{hostname}} sudah aktif", "en": "{{hostname}} is live" },
+    "saved_pending": { "id": "{{hostname}} disimpan: {{error}}", "en": "{{hostname}} saved: {{error}}" }
+  }
+}

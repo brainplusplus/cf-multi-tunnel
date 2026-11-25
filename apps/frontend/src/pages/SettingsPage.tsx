@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowUpCircle, CheckCircle2, Container, Globe2, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowUpCircle, CheckCircle2, Container, Globe2, RefreshCw, Trash2, TriangleAlert } from 'lucide-react';
 import { apiMessage } from '../api/client';
 import { accountsApi, connectorApi, panelApi, tunnelsApi } from '../api/endpoints';
 import { Badge, ErrorBox, Field, PageHeader, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
+import { useTranslation } from '../i18n/useTranslation';
 import type { CFAccount, CFZone, ConnectorStatus, PanelAddress, PublishedApp, RemoteTag, Tunnel } from '../types';
 
 export default function SettingsPage() {
+  const { t } = useTranslation('settings');
   return (
     <div className="space-y-8">
-      <PageHeader title="Settings" description="Panel exposure and the connector runtime." />
+      <PageHeader title={t('title')} description={t('description')} />
       <PanelExposureCard />
       <ConnectorCard />
     </div>
@@ -17,6 +19,7 @@ export default function SettingsPage() {
 }
 
 function PanelExposureCard() {
+  const { t } = useTranslation('settings');
   const toast = useToast();
   const [accounts, setAccounts] = useState<CFAccount[]>([]);
   const [tunnels, setTunnels] = useState<Tunnel[]>([]);
@@ -27,7 +30,6 @@ function PanelExposureCard() {
   const [tunnelId, setTunnelId] = useState('');
   const [subdomain, setSubdomain] = useState('');
   const [domain, setDomain] = useState('');
-  const [serviceUrl, setServiceUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -43,7 +45,14 @@ function PanelExposureCard() {
       setTunnels(tuns);
       setExposure(exp);
       setAddress(addr);
-      setTunnelId(exp?.tunnel_id ?? tuns.find((t) => t.config_src === 'cloudflare')?.id ?? '');
+      // Only a tunnel installed on this server can carry the panel, so the
+      // preselection ignores anything else. An exposure left on a remote tunnel
+      // keeps its warning below instead of being silently rewritten.
+      const local = tuns.filter((tun) => tun.location === 'local' && tun.config_src === 'cloudflare');
+      const exposureTunnel = exp ? tuns.find((tun) => tun.id === exp.tunnel_id) : undefined;
+      setTunnelId(
+        exposureTunnel?.location === 'local' ? exposureTunnel.id : (local[0]?.id ?? ''),
+      );
       if (exp) {
         // zone_name is the zone the panel resolved when the exposure was
         // created, so it is always the right split point.
@@ -54,11 +63,9 @@ function PanelExposureCard() {
             ? exp.hostname.slice(0, -(zoneName.length + 1))
             : exp.hostname,
         );
-        setServiceUrl(exp.service_url);
       } else {
         setSubdomain('');
         setDomain('');
-        setServiceUrl(addr.remote_service_url);
       }
       setError('');
     } catch (err) {
@@ -70,9 +77,9 @@ function PanelExposureCard() {
     void load();
   }, [load]);
 
-  const selectedTunnel = tunnels.find((t) => t.id === tunnelId);
+  const selectedTunnel = tunnels.find((tun) => tun.id === tunnelId);
   const tunnelAccountId = selectedTunnel?.cf_account_id ?? '';
-  const isRemote = selectedTunnel?.location === 'remote';
+  const effectiveServiceUrl = address?.internal_url ?? '';
 
   // Zones follow the tunnel's account. Only tunnels with API access can carry
   // the panel, and their account is the one whose zones matter.
@@ -100,9 +107,16 @@ function PanelExposureCard() {
   }, [zones, domain]);
 
   const publishable = tunnels.filter(
-    (t) => t.config_src === 'cloudflare' && (!accountFilter || t.cf_account_id === accountFilter),
+    (tun) =>
+      tun.location === 'local' &&
+      tun.config_src === 'cloudflare' &&
+      (!accountFilter || tun.cf_account_id === accountFilter),
   );
-  const effectiveServiceUrl = isRemote ? serviceUrl : (address?.internal_url ?? '');
+
+  // An existing exposure can still point at a remote tunnel (created before the
+  // rule changed). Say so instead of pretending the dropdown can edit it.
+  const exposureTunnel = exposure ? tunnels.find((tun) => tun.id === exposure.tunnel_id) : undefined;
+  const exposureIsRemote = exposureTunnel ? exposureTunnel.location !== 'local' : false;
 
   const onTunnelChange = (id: string) => {
     setTunnelId(id);
@@ -110,7 +124,6 @@ function PanelExposureCard() {
     // zones. The effects above repopulate from the new tunnel's account.
     setZones([]);
     setDomain('');
-    setServiceUrl(address?.remote_service_url ?? '');
   };
 
   const save = async () => {
@@ -121,9 +134,8 @@ function PanelExposureCard() {
         tunnel_id: tunnelId,
         subdomain: subdomain.trim(),
         domain,
-        ...(isRemote ? { service_url: serviceUrl.trim() } : {}),
       });
-      toast.push(app.sync_status === 'synced' ? 'success' : 'info', app.last_error || 'Panel exposure saved');
+      toast.push(app.sync_status === 'synced' ? 'success' : 'info', app.last_error || t('exposure.saved'));
       await load();
     } catch (err) {
       setError(apiMessage(err));
@@ -133,11 +145,11 @@ function PanelExposureCard() {
   };
 
   const remove = async () => {
-    if (!window.confirm('Remove the public panel exposure? DNS and ingress are cleaned up.')) return;
+    if (!window.confirm(t('exposure.remove_confirm'))) return;
     setBusy(true);
     try {
       await panelApi.remove();
-      toast.push('success', 'Panel exposure removed');
+      toast.push('success', t('exposure.removed'));
       setExposure(null);
       setSubdomain('');
       await load();
@@ -155,31 +167,42 @@ function PanelExposureCard() {
           <Globe2 className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-white">Panel exposure</h2>
-          <p className="mt-1 text-sm text-slate-400">
-            Publish this dashboard through one of your tunnels so you can open it from a hostname instead of a port.
-          </p>
+          <h2 className="text-sm font-semibold text-white">{t('exposure.title')}</h2>
+          <p className="mt-1 text-sm text-slate-400">{t('exposure.description')}</p>
         </div>
       </div>
 
       {error && <div className="mb-4"><ErrorBox message={error} /></div>}
 
       {exposure && (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-surface-700 bg-surface-950/50 px-3 py-2 text-xs">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-          <span className="text-slate-300">{exposure.hostname}</span>
-          <Badge tone={exposure.sync_status === 'synced' ? 'green' : 'amber'}>{exposure.sync_status}</Badge>
-          <span className="font-mono text-slate-500">→ {exposure.service_url}</span>
-          <button className="btn-danger ml-auto !px-2 !py-1 !text-xs" disabled={busy} onClick={() => void remove()}>
-            <Trash2 className="h-3.5 w-3.5" /> Remove
-          </button>
+        <div className="mb-4 space-y-2">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-surface-700 bg-surface-950/50 px-3 py-2 text-xs">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            <span className="text-slate-300">{exposure.hostname}</span>
+            <Badge tone={exposure.sync_status === 'synced' ? 'green' : 'amber'}>{exposure.sync_status}</Badge>
+            <span className="font-mono text-slate-500">→ {exposure.service_url}</span>
+            <button className="btn-danger ml-auto !px-2 !py-1 !text-xs" disabled={busy} onClick={() => void remove()}>
+              <Trash2 className="h-3.5 w-3.5" /> {t('exposure.remove')}
+            </button>
+          </div>
+          {exposureIsRemote && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                {t('exposure.remote_warning', {
+                  name: exposureTunnel?.name ?? '—',
+                  service: exposure.service_url,
+                })}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Account" hint="Optional filter. The panel can only be published through a tunnel with an API token.">
+        <Field label={t('exposure.account')} hint={t('exposure.account_hint')}>
           <select className="field" value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}>
-            <option value="">All accounts</option>
+            <option value="">{t('exposure.all_accounts')}</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
@@ -187,20 +210,21 @@ function PanelExposureCard() {
             ))}
           </select>
         </Field>
-        <Field label="Tunnel" error={publishable.length === 0 ? 'No tunnel with an API token yet.' : undefined}>
+        <Field label={t('exposure.tunnel')} error={publishable.length === 0 ? t('exposure.no_local_tunnel') : undefined}>
           <select className="field" value={tunnelId} onChange={(e) => onTunnelChange(e.target.value)}>
-            <option value="">Select a tunnel</option>
-            {publishable.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.location === 'local' ? 'this server' : 'remote'})
+            <option value="">{t('exposure.select_tunnel')}</option>
+            {publishable.map((tun) => (
+              <option key={tun.id} value={tun.id}>
+                {tun.name}
               </option>
             ))}
           </select>
         </Field>
       </div>
+      <p className="mt-1.5 text-[11px] text-slate-500">{t('exposure.tunnel_hint')}</p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1.4fr]">
-        <Field label="Subdomain">
+        <Field label={t('exposure.subdomain')}>
           <input
             className="field"
             value={subdomain}
@@ -210,8 +234,8 @@ function PanelExposureCard() {
           />
         </Field>
         <Field
-          label="Domain"
-          hint={zones.length === 0 ? 'No zone cached for this account; sync zones in Accounts first.' : undefined}
+          label={t('exposure.domain')}
+          hint={zones.length === 0 ? t('exposure.no_zones') : undefined}
         >
           {zones.length > 0 && zones.some((z) => z.name === domain) ? (
             <select className="field" value={domain} onChange={(e) => setDomain(e.target.value)}>
@@ -234,31 +258,14 @@ function PanelExposureCard() {
       </div>
 
       <div className="mt-3">
-        {isRemote ? (
-          <Field
-            label="Panel address reachable from that device"
-            hint="Filled in automatically from PUBLIC_URL. Change it only if that device reaches the panel another way."
-          >
-            <input
-              className="field font-mono text-xs"
-              value={serviceUrl}
-              onChange={(e) => setServiceUrl(e.target.value)}
-              placeholder="http://192.168.1.10:7777"
-            />
-          </Field>
-        ) : (
-          <Field
-            label="Service URL"
-            hint="Set automatically: the connector container reaches the panel on the Docker network."
-          >
-            <input className="field font-mono text-xs" value={effectiveServiceUrl} readOnly disabled />
-          </Field>
-        )}
+        <Field label={t('exposure.service_url')} hint={t('exposure.service_auto')}>
+          <input className="field font-mono text-xs" value={effectiveServiceUrl} readOnly disabled />
+        </Field>
       </div>
 
       {subdomain && domain && (
         <p className="mt-3 text-xs text-slate-500">
-          Will be published as{' '}
+          {t('exposure.will_publish')}{' '}
           <span className="font-mono text-slate-300">
             {subdomain.trim()}.{domain}
           </span>{' '}
@@ -266,18 +273,13 @@ function PanelExposureCard() {
         </p>
       )}
 
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <p className="text-xs text-slate-500">
-          Publishing here also adds this hostname to the tunnel&apos;s ingress and to{' '}
-          <span className="text-slate-400">Published apps</span>
-          {selectedTunnel ? ` (${selectedTunnel.name})` : ''}.
-        </p>
+      <div className="mt-3 flex items-center justify-end gap-3">
         <button
           className="btn-primary"
-          disabled={busy || !tunnelId || !subdomain.trim() || !domain || (isRemote && !serviceUrl.trim())}
+          disabled={busy || !tunnelId || !subdomain.trim() || !domain}
           onClick={() => void save()}
         >
-          {busy && <Spinner className="h-4 w-4" />} {exposure ? 'Update exposure' : 'Publish panel'}
+          {busy && <Spinner className="h-4 w-4" />} {exposure ? t('exposure.update') : t('exposure.publish')}
         </button>
       </div>
     </section>
@@ -285,6 +287,7 @@ function PanelExposureCard() {
 }
 
 function ConnectorCard() {
+  const { t } = useTranslation('settings');
   const toast = useToast();
   const [status, setStatus] = useState<ConnectorStatus | null>(null);
   const [tags, setTags] = useState<RemoteTag[]>([]);
@@ -315,7 +318,7 @@ function ConnectorCard() {
     setBusy('tags');
     try {
       setTags(await connectorApi.tags());
-      toast.push('success', 'Fetched published tags from Docker Hub');
+      toast.push('success', t('connector.tags_fetched'));
     } catch (err) {
       toast.push('error', apiMessage(err));
     } finally {
@@ -324,7 +327,7 @@ function ConnectorCard() {
   };
 
   const update = async () => {
-    if (!window.confirm('Pull the image and recreate every managed connector? Tunnels reconnect automatically.')) return;
+    if (!window.confirm(t('connector.update_confirm'))) return;
     setBusy('update');
     setError('');
     try {
@@ -334,8 +337,8 @@ function ConnectorCard() {
       const failed = result.failed ?? [];
       toast.push(
         failed.length === 0 ? 'success' : 'info',
-        `Updated to ${result.image.version || image}. Recreated ${recreated.length} connector(s)` +
-          (failed.length ? `, ${failed.length} failed` : ''),
+        t('connector.update_done', { version: result.image.version || image, count: recreated.length }) +
+          (failed.length ? t('connector.update_failed_count', { count: failed.length }) : ''),
       );
       await load(false);
     } catch (err) {
@@ -362,55 +365,51 @@ function ConnectorCard() {
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="rounded-lg bg-sky-500/15 p-2 text-sky-300">
-            <Container className="h-5 w-5" />          </div>
+            <Container className="h-5 w-5" />
+          </div>
           <div>
-            <h2 className="text-sm font-semibold text-white">Connector runtime</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              cloudflared runs as one container per tunnel. Updating the image recreates them without touching your data.
-            </p>
+            <h2 className="text-sm font-semibold text-white">{t('connector.title')}</h2>
+            <p className="mt-1 text-sm text-slate-400">{t('connector.description')}</p>
           </div>
         </div>
         <button className="btn-ghost !px-2 !py-1.5 !text-xs" disabled={busy === 'load'} onClick={() => void load(true)}>
-          {busy === 'load' ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />} Check
+          {busy === 'load' ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          {t('connector.check')}
         </button>
       </div>
 
       {error && <div className="mb-4"><ErrorBox message={error} /></div>}
 
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Stat label="Mode" value={status.mode} />
-        <Stat label="Docker" value={status.docker_available ? status.docker_version : 'unreachable'} tone={status.docker_available ? 'green' : 'red'} />
-        <Stat label="Installed" value={status.image.version || 'unknown'} mono />
+      <div className="mb-4 grid gap-2 sm:grid-cols-4">
+        <Stat label={t('connector.mode')} value={t('connector.docker')} />
         <Stat
-          label="Latest"
-          value={status.latest_version || '—'}
+          label={t('connector.installed')}
+          value={status.image.version || t('connector.unknown')}
           mono
-          tone={status.update_available ? 'amber' : 'green'}
+        />
+        <Stat label={t('connector.latest')} value={status.latest_version || t('connector.unknown')} mono />
+        <Stat
+          label={t('connector.active_image')}
+          value={status.image.image}
+          mono
         />
       </div>
 
-      <div className="mt-4 rounded-lg border border-surface-700 bg-surface-950/40 p-3">
-        <p className="text-[11px] uppercase tracking-wider text-slate-500">Active image</p>
-        <p className="mt-1 font-mono text-xs text-slate-300">{status.image.image || '—'}</p>
-        {status.image.digest && <p className="mt-1 truncate font-mono text-[11px] text-slate-600">{status.image.digest}</p>}
-        {status.image.error && <p className="mt-1 text-[11px] text-amber-300">{status.image.error}</p>}
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-[1.6fr_auto]">
-        <Field label="Target image" hint={`Any tag from ${repo}, e.g. ${repo}:latest or a pinned version.`}>
+      <div className="grid gap-3 sm:grid-cols-[1.4fr_1fr]">
+        <Field label={t('connector.target_image')} hint={t('connector.target_hint')}>
           <input className="field font-mono text-xs" value={image} onChange={(e) => setImage(e.target.value)} />
         </Field>
         <div className="flex items-end gap-2">
           <button className="btn-ghost" disabled={busy === 'tags'} onClick={() => void loadTags()}>
-            {busy === 'tags' ? <Spinner className="h-4 w-4" /> : null} Browse tags
+            {busy === 'tags' ? <Spinner className="h-4 w-4" /> : null} {t('connector.browse_tags')}
           </button>
           {status.update_available && (
             <button
               className="btn-ghost"
               onClick={() => setImage(`${repo}:${status.latest_version}`)}
-              title="Use the latest published version"
+              title={t('connector.use_latest', { version: status.latest_version })}
             >
-              <ArrowUpCircle className="h-4 w-4" /> Use {status.latest_version}
+              <ArrowUpCircle className="h-4 w-4" /> {t('connector.use_latest', { version: status.latest_version })}
             </button>
           )}
         </div>
@@ -438,10 +437,11 @@ function ConnectorCard() {
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-sm text-slate-300">
           <input type="checkbox" checked={pin} onChange={(e) => setPin(e.target.checked)} />
-          Remember this image for future starts
+          {t('connector.remember')}
         </label>
         <button className="btn-primary" disabled={busy === 'update' || !image} onClick={() => void update()}>
-          {busy === 'update' ? <Spinner className="h-4 w-4" /> : <ArrowUpCircle className="h-4 w-4" />} Pull &amp; recreate
+          {busy === 'update' ? <Spinner className="h-4 w-4" /> : <ArrowUpCircle className="h-4 w-4" />}{' '}
+          {t('connector.pull_recreate')}
         </button>
       </div>
 
@@ -450,16 +450,16 @@ function ConnectorCard() {
           <table className="w-full">
             <thead className="bg-surface-900/60">
               <tr>
-                <th className="th">Tunnel</th>
-                <th className="th">Running version</th>
-                <th className="th">Image ref</th>
+                <th className="th">{t('connector.tunnel')}</th>
+                <th className="th">{t('connector.running_version')}</th>
+                <th className="th">{t('connector.image_ref')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-800">
               {status.running_versions.map((row) => (
                 <tr key={row.tunnel_id}>
                   <td className="td">{row.name}</td>
-                  <td className="td font-mono text-xs">{row.version || 'unknown'}</td>
+                  <td className="td font-mono text-xs">{row.version || t('connector.unknown')}</td>
                   <td className="td font-mono text-[11px] text-slate-500">{row.image_ref || '—'}</td>
                 </tr>
               ))}

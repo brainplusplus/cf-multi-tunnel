@@ -1,0 +1,125 @@
+{
+  "title": { "id": "DNS", "en": "DNS" },
+  "description": {
+    "id": "Kelola record DNS untuk domain yang tersinkron, termasuk CNAME yang dipakai tunnel.",
+    "en": "Manage DNS records for synced domains, including the CNAMEs your tunnels use."
+  },
+  "account": { "id": "Akun", "en": "Account" },
+  "all_accounts": { "id": "Semua akun", "en": "All accounts" },
+  "zone": { "id": "Domain", "en": "Domain" },
+  "pick_zone": { "id": "Pilih domain", "en": "Pick a domain" },
+  "sync": { "id": "Sinkron", "en": "Sync" },
+  "sync_done": {
+    "id": "{{zones}} zona dari {{accounts}} akun diperbarui.",
+    "en": "Refreshed {{zones}} zone(s) from {{accounts}} account(s)."
+  },
+  "sync_partial": {
+    "id": "Sebagian akun gagal: {{first}}",
+    "en": "Some accounts failed: {{first}}"
+  },
+  "add_record": { "id": "Tambah record", "en": "Add record" },
+  "search": { "id": "Cari nama atau isi record", "en": "Search name or content" },
+  "empty_zones_title": { "id": "Belum ada domain tersinkron", "en": "No domain synced yet" },
+  "empty_zones_desc": {
+    "id": "Sinkronkan akun agar domain yang token-nya bisa dijangkau muncul di sini.",
+    "en": "Sync the accounts so the domains their tokens can reach show up here."
+  },
+  "sync_now": { "id": "Sinkron sekarang", "en": "Sync now" },
+  "empty_records": { "id": "Domain ini belum punya record.", "en": "This domain has no records yet." },
+  "no_zone": { "id": "Pilih domain untuk melihat record.", "en": "Pick a domain to see its records." },
+  "truncated": {
+    "id": "Menampilkan {{shown}} record pertama; zona ini punya lebih banyak.",
+    "en": "Showing the first {{shown}} records; this zone has more."
+  },
+  "columns": {
+    "name": { "id": "Nama", "en": "Name" },
+    "type": { "id": "Tipe", "en": "Type" },
+    "content": { "id": "Isi", "en": "Content" },
+    "proxy": { "id": "Proxy", "en": "Proxy" },
+    "ttl": { "id": "TTL", "en": "TTL" },
+    "comment": { "id": "Komentar", "en": "Comment" },
+    "actions": { "id": "Aksi", "en": "Actions" }
+  },
+  "proxy": {
+    "proxied": { "id": "Proxied", "en": "Proxied" },
+    "dns_only": { "id": "DNS only", "en": "DNS only" }
+  },
+  "ttl": {
+    "auto": { "id": "Auto", "en": "Auto" },
+    "seconds": { "id": "{{count}} detik", "en": "{{count}} seconds" }
+  },
+  "managed_label": { "id": "Dikelola tunnel", "en": "Tunnel-managed" },
+  "managed_hint": {
+    "id": "Record ini dipakai aplikasi publik. Ubah dari halaman tunnel agar ingress dan DNS tetap sinkron.",
+    "en": "This record is used by a published app. Change it from the tunnel page so ingress and DNS stay in sync."
+  },
+  "manage_in_tunnel": { "id": "Kelola di tunnel", "en": "Manage in tunnel" },
+  "edit_hint": { "id": "Ubah record", "en": "Edit record" },
+  "delete_hint": { "id": "Hapus record", "en": "Delete record" },
+  "delete_confirm": {
+    "id": "Hapus record {{type}} {{name}}? Perubahan langsung berlaku di Cloudflare.",
+    "en": "Delete the {{type}} record {{name}}? The change applies to Cloudflare immediately."
+  },
+  "created": { "id": "Record {{name}} dibuat", "en": "Record {{name}} created" },
+  "updated": { "id": "Record {{name}} diperbarui", "en": "Record {{name}} updated" },
+  "deleted": { "id": "Record dihapus", "en": "Record deleted" },
+  "guide": {
+    "title": { "id": "Tunnel dan DNS", "en": "Tunnels and DNS" },
+    "tunnel": {
+      "id": "Baris bertipe Tunnel adalah CNAME ke <id>.cfargotunnel.com: trafik masuk lewat cloudflared, bukan langsung ke origin.",
+      "en": "A Tunnel row is a CNAME to <id>.cfargotunnel.com: traffic enters through cloudflared instead of hitting the origin directly."
+    },
+    "locked": {
+      "id": "Record milik aplikasi publik dikunci di sini. Edit atau hapus lewat halaman tunnel supaya aturan ingress dan DNS tidak berbeda.",
+      "en": "Records owned by a published app are locked here. Edit or delete them from the tunnel page so ingress and DNS cannot disagree."
+    },
+    "permissions": {
+      "id": "Token Cloudflare butuh Zone:Read untuk melihat dan Zone:DNS:Edit untuk menulis record.",
+      "en": "The Cloudflare token needs Zone:Read to list and Zone:DNS:Edit to write records."
+    },
+    "ttl": {
+      "id": "TTL Auto mengikuti Cloudflare. Record yang di-proxy selalu memakai TTL Auto.",
+      "en": "Auto TTL follows Cloudflare. A proxied record always uses Auto TTL."
+    }
+  },
+  "fields": {
+    "name": { "id": "Nama", "en": "Name" },
+    "name_hint": {
+      "id": "Kosongkan atau isi @ untuk akar domain. Contoh: app, www, _dmarc.",
+      "en": "Leave empty or use @ for the apex. Examples: app, www, _dmarc."
+    },
+    "type": { "id": "Tipe", "en": "Type" },
+    "content": { "id": "Isi", "en": "Content" },
+    "content_a": { "id": "Alamat IPv4, mis. 203.0.113.10", "en": "IPv4 address, e.g. 203.0.113.10" },
+    "content_aaaa": { "id": "Alamat IPv6, mis. 2001:db8::1", "en": "IPv6 address, e.g. 2001:db8::1" },
+    "content_cname": { "id": "Hostname tujuan, mis. target.example.com", "en": "Target hostname, e.g. target.example.com" },
+    "content_ns": { "id": "Hostname nameserver", "en": "Nameserver hostname" },
+    "content_txt": { "id": "Teks record, mis. v=spf1 include:...", "en": "Record text, e.g. v=spf1 include:..." },
+    "content_mx": { "id": "Hostname mail server, mis. mx1.example.com", "en": "Mail server hostname, e.g. mx1.example.com" },
+    "priority": { "id": "Prioritas", "en": "Priority" },
+    "service": { "id": "Service", "en": "Service" },
+    "service_hint": { "id": "mis. _sip atau _xmpp", "en": "e.g. _sip or _xmpp" },
+    "protocol": { "id": "Protokol", "en": "Protocol" },
+    "weight": { "id": "Weight", "en": "Weight" },
+    "port": { "id": "Port", "en": "Port" },
+    "target": { "id": "Target", "en": "Target" },
+    "flags": { "id": "Flags", "en": "Flags" },
+    "tag": { "id": "Tag", "en": "Tag" },
+    "value": { "id": "Nilai", "en": "Value" },
+    "ttl": { "id": "TTL", "en": "TTL" },
+    "proxied": { "id": "Proxied lewat Cloudflare", "en": "Proxy through Cloudflare" },
+    "proxied_hint": {
+      "id": "Hanya untuk A, AAAA, dan CNAME. Matikan untuk DNS only.",
+      "en": "A, AAAA and CNAME only. Turn it off for DNS only."
+    },
+    "comment": { "id": "Komentar", "en": "Comment" },
+    "comment_hint": { "id": "Opsional, catatan untuk operator.", "en": "Optional note for operators." }
+  },
+  "modal": {
+    "create_title": { "id": "Tambah record DNS", "en": "Add DNS record" },
+    "edit_title": { "id": "Ubah record DNS", "en": "Edit DNS record" },
+    "create_desc": { "id": "Record ditulis langsung ke Cloudflare.", "en": "The record is written straight to Cloudflare." },
+    "edit_desc": { "id": "Perubahan langsung berlaku di Cloudflare.", "en": "The change applies to Cloudflare immediately." },
+    "submit": { "id": "Simpan record", "en": "Save record" }
+  }
+}

@@ -3,9 +3,11 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { Wifi } from 'lucide-react';
 import { apiMessage } from '../api/client';
 import { ErrorBox, Field, Spinner } from '../components/ui';
+import { useTranslation } from '../i18n/useTranslation';
 import { useAuth } from '../store/auth-context';
 
 export default function LoginPage() {
+  const { t } = useTranslation('login');
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -37,14 +39,14 @@ export default function LoginPage() {
             <Wifi className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-white">CF Tunnel Panel</h1>
-            <p className="text-sm text-slate-400">Manage Cloudflare tunnels across accounts</p>
+            <h1 className="text-lg font-semibold text-white">{t('panel_title')}</h1>
+            <p className="text-sm text-slate-400">{t('panel_subtitle')}</p>
           </div>
         </div>
 
         <form onSubmit={submit} className="card space-y-4 p-6">
           {error && <ErrorBox message={error} />}
-          <Field label="Email">
+          <Field label={t('email')}>
             <input
               className="field"
               type="email"
@@ -54,7 +56,7 @@ export default function LoginPage() {
               required
             />
           </Field>
-          <Field label="Password">
+          <Field label={t('password')}>
             <input
               className="field"
               type="password"
@@ -66,7 +68,7 @@ export default function LoginPage() {
           </Field>
           <button type="submit" className="btn-primary w-full" disabled={busy}>
             {busy ? <Spinner className="h-4 w-4" /> : null}
-            Sign in
+            {t('submit')}
           </button>
         </form>
       </div>

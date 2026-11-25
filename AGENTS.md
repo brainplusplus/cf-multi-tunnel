@@ -85,13 +85,16 @@ is refused (409) because the cascade would silently unpublish the control plane.
 `SetPanelExposure` reuses the existing row and refuses a hostname already owned by
 another app.
 
-**Panel service URL is derived, not typed.**
-`resolvePanelServiceURL`: local tunnel → `PANEL_INTERNAL_URL`; remote tunnel → the
-operator's value, else `PUBLIC_URL` when its host is an IP literal. `checkNoLoop`
-rejects the published hostname, and rejects `PUBLIC_URL` only when it is a DNS name
-(an IP can never loop). Do not restore the old "service URL may never equal
-`PUBLIC_URL`" rule — it breaks the normal single-host install where `PUBLIC_URL` is
-the LAN IP.
+**Panel service URL is derived, and the tunnel must be on this server.**
+`resolvePanelServiceURL` accepts only `location=local` and returns
+`PANEL_INTERNAL_URL`; anything else is a 422 naming `tunnel_id`. The connector
+container reaches the dashboard over the Docker network, while a connector on
+another device cannot resolve that name and pointing it at `PUBLIC_URL` loops
+back through the tunnel being created. Do not re-add a "remote exposure" branch
+or a typed service URL: `PanelExposureInput` has none, `PanelAddress` exposes only
+`public_url`/`internal_url`, and `checkNoLoop`/`remotePanelServiceURL` are gone.
+An exposure left on a remote tunnel from before this rule is still listed in
+Settings with a warning so it is not lost silently.
 
 **Adding a token upgrades, it does not duplicate.**
 `AccountService.CreateWithToken` reuses an existing `owner_id + account_id` row with
@@ -139,22 +142,69 @@ passwords — do not turn this back into a hard failure.
 per-IP) on purpose: the panel sits behind one reverse-proxy IP or a tunnel. Counters
 reset on restart, which is also how to clear a lockout while testing.
 
+**Impersonation is a short-lived token, never a refreshed session.**
+`AuthService.Impersonate` (admin-only, `POST /api/auth/impersonate`) mints an
+access token that carries the **target's** role and `imp=admin-id`. Middleware
+re-reads the user, so the session really loses admin endpoints instead of only
+looking like it. There is no refresh token: `POST /api/auth/exit-impersonation`
+only writes the audit entry, and the browser restores the parked admin tokens
+from `localStorage.impersonation`. `api/client.ts` must never refresh out of an
+impersonated session — it restores the admin and reloads instead. Audit both
+`user.impersonate_start` (naming the admin) and `user.impersonate_end`.
+
+**UI text is never a literal. i18n is mandatory for new pages.**
+Every page/component calls `useTranslation('<module>')` and reads text from
+`src/locales/<module>.json`, whose leaves are `{ "id": "...", "en": "..." }`.
+Adding a page means adding the json file and registering it in
+`src/i18n/useTranslation.ts` — nothing else. `t('key', {name})` interpolates
+`{{name}}`; a missing key renders the key itself and warns in dev. The default
+language is `id`; the sidebar switcher persists it in `localStorage.language`.
+`ApiTokenGuide.tsx` is the one deliberate exception: its permission names are
+Cloudflare's own English labels and stay untranslated, while its surroundings
+are translated.
+
+**List pages use the shared `DataTable` + `QueryBuilder`.**
+`components/DataTable.tsx` owns sorting, pagination, page size and per-table
+column visibility (`localStorage.table:<tableId>:hidden`), and
+`components/QueryBuilder.tsx` + `components/query.ts` own the nested AND/OR
+filter model (`matchesQuery`). Every list page must use both with a stable
+`tableId`, a client-side search box and `emptyMessage={tc('no_match')}`. Do not
+hand-roll another `<table>` with its own pager; the tunnel detail page is the
+only exception because it shows one tunnel's handful of routes.
+
+**DNS records are live, and a tunnel-owned CNAME is locked.**
+`services/dns_service.go` reads every record straight from Cloudflare on each
+request (`cloudflare.ListAllDNSRecords`); only the zone list is cached, as the
+directory of what can be opened. Do not add a local DNS record cache — a stale
+row the operator deletes is a silent outage. A row is **managed** when a
+`published_app` owns that record id, or when its CNAME target ends in
+`.cfargotunnel.com` and the hostname is published on that zone; managed rows are
+edited/deleted from the tunnel page and the service returns 409 for
+`dns.update`/`dns.delete` on them. `POST /api/dns/zones/sync` refreshes zones per
+API-token account and never deletes a cached zone; `dns.zones_sync` is audited.
+Record type drives validation (`buildDNSRecordInput`): A/AAAA must match the right
+IP family, only A/AAAA/CNAME may carry `proxied`, MX/SRV need a priority, SRV's
+owner is `_service._proto`, CAA uses `data.flags/tag/value`. A relative name
+(`www`) is expanded to `www.<zone>`; an absolute name is kept.
+
 ## Gotchas
 
 - **The SPA needs its provider tree.** `src/main.tsx` must wrap `<App />` in
-  `<BrowserRouter>` → `<ToastProvider>` → `<AuthProvider>`. Without `BrowserRouter`,
-  `<Routes>` throws "useRoutes() may be used only in the context of a `<Router>`
-  component"; without the two providers every page throws on `useAuth()`/`useToast()`.
-  The failure mode is a **blank page with one console error** while `/api` keeps
-  working, so always open the built UI in a browser, not just curl.
+  `<BrowserRouter>` → `<LanguageProvider>` → `<ToastProvider>` → `<AuthProvider>`.
+  Without `BrowserRouter`, `<Routes>` throws "useRoutes() may be used only in the
+  context of a `<Router>` component"; without the other three every page throws on
+  `useAuth()`/`useToast()`/`useTranslation()`. The failure mode is a **blank page
+  with one console error** while `/api` keeps working, so always open the built UI
+  in a browser, not just curl.
 - Tailwind 4: component classes in `src/index.css` must repeat utilities; `@apply btn`
   fails with "unknown utility class".
 - `lucide-react` here has no `Docker` icon — use `Container`.
 - Cloudflare cannot edit tunnels with `config_src=local|unknown` via API. Show a
   `config.yml` example instead of pretending the write succeeded.
-- Panel exposure on a remote tunnel requires an explicit `service_url` (LAN/VPN) and
-  is validated by `checkNoLoop` (must not resolve back to the published hostname or
-  `PUBLIC_URL`).
+- Panel exposure is local-tunnel-only; the Settings dropdown filters
+  `location === 'local' && config_src === 'cloudflare'` and the backend rejects
+  anything else with a 422 on `tunnel_id`. A pre-existing exposure on a remote
+  tunnel stays visible with a warning.
 - Connector image is resolved at runtime: `settings` key `connector.image` overrides
   `CLOUDFLARED_IMAGE`.
 - Dev ports: backend 3001, Vite 3002 (proxies `/api`), reverse proxy 7777 (reads `PORT`

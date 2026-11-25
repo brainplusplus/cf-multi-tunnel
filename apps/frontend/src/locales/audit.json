@@ -1,0 +1,27 @@
+{
+  "title": { "id": "Log audit", "en": "Audit log" },
+  "description": {
+    "id": "Setiap perubahan yang dilakukan lewat panel, terbaru lebih dulu.",
+    "en": "Every mutation performed through the panel, newest first."
+  },
+  "columns": {
+    "when": { "id": "Waktu", "en": "When" },
+    "actor": { "id": "Pelaku", "en": "Actor" },
+    "action": { "id": "Aksi", "en": "Action" },
+    "entity": { "id": "Entitas", "en": "Entity" },
+    "detail": { "id": "Detail", "en": "Detail" },
+    "ip": { "id": "IP", "en": "IP" }
+  },
+  "empty": { "id": "Belum ada catatan", "en": "Nothing logged yet" },
+  "truncated": {
+    "id": "Menampilkan {{shown}} dari {{total}} catatan terbaru.",
+    "en": "Showing the newest {{shown}} of {{total}} entries."
+  },
+  "filter": {
+    "actor": { "id": "Pelaku", "en": "Actor" },
+    "action": { "id": "Aksi", "en": "Action" },
+    "entity": { "id": "Entitas", "en": "Entity" },
+    "detail": { "id": "Detail", "en": "Detail" },
+    "ip": { "id": "IP", "en": "IP" }
+  }
+}

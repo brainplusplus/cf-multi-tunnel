@@ -99,6 +99,10 @@ type Claims struct {
 	UserID string `json:"uid"`
 	Email  string `json:"email"`
 	Role   string `json:"role"`
+	// ImpersonatedBy is the admin who started this session. It is empty for a
+	// normal login, and an access token that carries it is never paired with a
+	// refresh token: ending impersonation means restoring the admin's own token.
+	ImpersonatedBy string `json:"imp,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -205,6 +209,94 @@ func (s *AuthService) Logout(ctx context.Context, refreshToken string) {
 	if stored, err := s.tokens.FindByHash(ctx, hashToken(refreshToken)); err == nil {
 		_ = s.tokens.Revoke(ctx, stored.ID, "")
 	}
+}
+
+// ImpersonationTTL bounds a support session. It is deliberately short and there
+// is no refresh token, so an impersonated session cannot outlive the window or
+// be renewed silently — the admin's own token is what the browser goes back to.
+const ImpersonationTTL = 60 * time.Minute
+
+type ImpersonationResult struct {
+	AccessToken  string            `json:"access_token"`
+	ExpiresIn    int64             `json:"expires_in"`
+	User         models.PublicUser `json:"user"`          // the target
+	OriginalUser models.PublicUser `json:"original_user"` // the admin
+}
+
+// Impersonate issues an access token that acts as targetUserID.
+//
+// The token carries the target's role, so an admin viewing a normal user really
+// does lose admin endpoints instead of only pretending to. The admin who started
+// it is recorded on the token and in the audit log, because every action taken
+// during the session will otherwise look like the target did it.
+func (s *AuthService) Impersonate(ctx context.Context, caller Caller, targetUserID string, ip string) (*ImpersonationResult, error) {
+	if !caller.Admin {
+		return nil, Forbidden("admin role required")
+	}
+	targetUserID = strings.TrimSpace(targetUserID)
+	if targetUserID == "" {
+		return nil, Validation(map[string]string{"user_id": "required"})
+	}
+	if targetUserID == caller.ID {
+		return nil, BadRequest("you cannot impersonate your own account")
+	}
+
+	admin, err := s.GetUser(ctx, caller.ID)
+	if err != nil {
+		return nil, err
+	}
+	target, err := s.GetUser(ctx, targetUserID)
+	if err != nil {
+		return nil, err
+	}
+	if !target.IsActive {
+		return nil, BadRequest("target user account is inactive")
+	}
+
+	now := time.Now()
+	claims := &Claims{
+		UserID:         target.ID,
+		Email:          target.Email,
+		Role:           target.Role,
+		ImpersonatedBy: admin.ID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   target.ID,
+			ExpiresAt: jwt.NewNumericDate(now.Add(ImpersonationTTL)),
+			IssuedAt:  jwt.NewNumericDate(now),
+		},
+	}
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.cfg.JWTSecret)
+	if err != nil {
+		return nil, err
+	}
+
+	s.audit.Record(ctx, AuditEntry{
+		ActorID: admin.ID, ActorEmail: admin.Email, Action: "user.impersonate_start",
+		Entity: "user", EntityID: target.ID,
+		Detail: fmt.Sprintf("%s (%s) now acts as %s", admin.Name, admin.Email, target.Email),
+		IP:     ip,
+	})
+
+	return &ImpersonationResult{
+		AccessToken:  signed,
+		ExpiresIn:    int64(ImpersonationTTL.Seconds()),
+		User:         target.Public(),
+		OriginalUser: admin.Public(),
+	}, nil
+}
+
+// EndImpersonation only records that the session ended. The browser restores the
+// admin's own token; there is no refresh token to revoke.
+func (s *AuthService) EndImpersonation(ctx context.Context, caller Caller, impersonatedBy string, ip string) {
+	if impersonatedBy == "" {
+		return
+	}
+	s.audit.Record(ctx, AuditEntry{
+		ActorID: caller.ID, ActorEmail: caller.Email, Action: "user.impersonate_end",
+		Entity: "user", EntityID: caller.ID,
+		Detail: "stopped acting as " + caller.Email,
+		IP:     ip,
+	})
 }
 
 func (s *AuthService) ValidateAccess(token string) (*Claims, error) {

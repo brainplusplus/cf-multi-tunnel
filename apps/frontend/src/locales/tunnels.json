@@ -1,0 +1,92 @@
+{
+  "title": { "id": "Tunnel", "en": "Tunnels" },
+  "description": {
+    "id": "Tunnel yang dijalankan panel ini diawasi langsung. Tunnel di perangkat lain diatur lewat API Cloudflare, bukan lewat Docker.",
+    "en": "Tunnels hosted by this panel are supervised here. Tunnels on other devices are configured through the Cloudflare API, not through Docker."
+  },
+  "new_tunnel": { "id": "Tunnel baru", "en": "New tunnel" },
+  "columns": {
+    "tunnel": { "id": "Tunnel", "en": "Tunnel" },
+    "account": { "id": "Akun", "en": "Account" },
+    "placement": { "id": "Penempatan", "en": "Placement" },
+    "config": { "id": "Konfigurasi", "en": "Config" },
+    "apps": { "id": "Aplikasi", "en": "Apps" },
+    "status": { "id": "Status", "en": "Status" },
+    "last_seen": { "id": "Terakhir terlihat", "en": "Last seen" }
+  },
+  "placement": {
+    "all": { "id": "Semua penempatan", "en": "All placements" },
+    "local": { "id": "Server ini", "en": "This server" },
+    "remote": { "id": "Perangkat lain", "en": "Other devices" },
+    "local_hint": { "id": "host panel", "en": "panel host" },
+    "remote_hint": { "id": "perangkat tidak dikenal", "en": "unknown device" }
+  },
+  "status": {
+    "running": { "id": "berjalan", "en": "running" },
+    "stopped": { "id": "berhenti", "en": "stopped" },
+    "error": { "id": "error", "en": "error" },
+    "unknown": { "id": "tidak diketahui", "en": "unknown" },
+    "seen": { "id": "terlihat {{when}}", "en": "seen {{when}}" }
+  },
+  "actions": {
+    "start": { "id": "Jalankan", "en": "Start" },
+    "stop": { "id": "Hentikan", "en": "Stop" },
+    "started": { "id": "{{name}} dijalankan", "en": "{{name}} started" },
+    "stopped": { "id": "{{name}} dihentikan", "en": "{{name}} stopped" }
+  },
+  "empty": { "id": "Belum ada tunnel di sini", "en": "No tunnels here" },
+  "empty_hint": {
+    "id": "Buat tunnel yang dihosting panel ini, atau sinkronkan akun untuk mengimpor tunnel yang sudah berjalan di tempat lain.",
+    "en": "Create a tunnel hosted by this panel, or sync an account to import tunnels that already run elsewhere."
+  },
+  "filter": {
+    "name": { "id": "Nama", "en": "Name" },
+    "account": { "id": "Akun", "en": "Account" },
+    "placement": { "id": "Penempatan", "en": "Placement" },
+    "status": { "id": "Status", "en": "Status" },
+    "apps": { "id": "Jumlah aplikasi", "en": "App count" }
+  },
+  "sync_pick_account": { "id": "Pilih akun dulu", "en": "Pick an account first" },
+  "sync_tunnels": { "id": "{{count}} tunnel", "en": "{{count}} tunnel(s)" },
+  "sync_new": { "id": "{{count}} baru", "en": "{{count}} new" },
+  "sync_hostnames": { "id": "{{count}} hostname diimpor", "en": "{{count}} hostname(s) imported" },
+  "sync_skipped": { "id": "{{count}} dilewati", "en": "{{count}} skipped" },
+  "select_account": { "id": "Pilih akun", "en": "Select an account" },
+  "tunnel_name": { "id": "Nama tunnel", "en": "Tunnel name" },
+  "tunnel_name_hint": { "id": "Huruf kecil, angka, dan tanda hubung.", "en": "Lowercase letters, digits and dashes." },
+  "where_run": { "id": "Di mana cloudflared akan berjalan?", "en": "Where will cloudflared run?" },
+  "after_create_start": {
+    "id": "Setelah dibuat, tekan Jalankan pada baris tunnel untuk menyalakan connector.",
+    "en": "After creating, press Start on the tunnel row to launch the connector."
+  },
+  "after_create_copy": {
+    "id": "Setelah dibuat, buka tunnel dan salin token atau config.yml ke perangkat itu.",
+    "en": "After creating, open the tunnel and copy the token or config.yml to that device."
+  },
+  "create": {
+    "title": { "id": "Buat tunnel", "en": "Create tunnel" },
+    "description": {
+      "id": "Dibuat dengan konfigurasi remote, jadi ingress dan DNS tetap diatur dari sini.",
+      "en": "Created with remote configuration, so ingress and DNS are managed from here either way."
+    },
+    "name": { "id": "Nama", "en": "Name" },
+    "account": { "id": "Akun", "en": "Account" },
+    "host_label": { "id": "Label perangkat", "en": "Device label" },
+    "submit": { "id": "Buat", "en": "Create" },
+    "created": { "id": "Tunnel {{name}} dibuat", "en": "Tunnel {{name}} created" },
+    "no_account": {
+      "id": "Tidak ada akun dengan token API. Tambahkan di halaman Akun, atau impor token tunnel.",
+      "en": "No API-token account available. Add one on the Accounts page, or import a tunnel token instead."
+    },
+    "this_server": { "id": "Server ini", "en": "This server" },
+    "this_server_hint": {
+      "id": "Panel menjalankan satu container cloudflared dan mengawasinya: start, stop, log, versi.",
+      "en": "The panel runs one cloudflared container and supervises it: start, stop, logs, version."
+    },
+    "other_device": { "id": "Perangkat lain", "en": "Another device" },
+    "other_device_hint": {
+      "id": "cloudflared dijalankan sendiri di perangkat itu. Panel hanya mengatur ingress dan DNS.",
+      "en": "cloudflared runs on that device by itself. The panel only manages ingress and DNS."
+    }
+  }
+}

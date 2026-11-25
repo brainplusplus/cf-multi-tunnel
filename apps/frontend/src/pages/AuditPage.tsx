@@ -1,24 +1,111 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollText } from 'lucide-react';
 import { apiMessage } from '../api/client';
 import { auditApi } from '../api/endpoints';
+import { DataTable, type Column } from '../components/DataTable';
+import { FilterToggle, QueryBuilder, filterCount } from '../components/QueryBuilder';
+import { createGroup, matchesQuery, type FieldDefinition, type QueryGroup } from '../components/query';
 import { Badge, EmptyState, ErrorBox, PageHeader, Spinner } from '../components/ui';
+import { useTranslation } from '../i18n/useTranslation';
 import type { AuditLog } from '../types';
 
 export default function AuditPage() {
+  const { t } = useTranslation('audit');
+  const { t: tc } = useTranslation('common');
   const [logs, setLogs] = useState<AuditLog[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<QueryGroup>(() => createGroup());
 
   useEffect(() => {
     auditApi
       .list(1, 100)
-      .then((result) => setLogs(result.items))
+      .then((result) => {
+        setLogs(result.items);
+        setTotal(result.total);
+      })
       .catch((err) => setError(apiMessage(err)));
   }, []);
 
+  const fields: FieldDefinition[] = useMemo(
+    () => [
+      { name: 'actor_email', label: t('filter.actor'), type: 'string' },
+      { name: 'action', label: t('filter.action'), type: 'string' },
+      { name: 'entity', label: t('filter.entity'), type: 'string' },
+      { name: 'detail', label: t('filter.detail'), type: 'string' },
+      { name: 'ip', label: t('filter.ip'), type: 'string' },
+    ],
+    [t],
+  );
+
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (logs ?? []).filter((log) => {
+      if (
+        term &&
+        !`${log.actor_email} ${log.action} ${log.entity} ${log.detail} ${log.ip}`.toLowerCase().includes(term)
+      ) {
+        return false;
+      }
+      return matchesQuery(log as unknown as Record<string, unknown>, filters);
+    });
+  }, [logs, search, filters]);
+
+  const columns: Column<AuditLog>[] = [
+    {
+      key: 'created_at',
+      label: t('columns.when'),
+      sortable: true,
+      width: 180,
+      render: (log) => (
+        <span className="whitespace-nowrap text-xs text-slate-400">{new Date(log.created_at).toLocaleString()}</span>
+      ),
+    },
+    {
+      key: 'actor_email',
+      label: t('columns.actor'),
+      sortable: true,
+      width: 200,
+      render: (log) => <span className="text-xs">{log.actor_email || '—'}</span>,
+    },
+    {
+      key: 'action',
+      label: t('columns.action'),
+      sortable: true,
+      width: 200,
+      render: (log) => <Badge tone="blue">{log.action}</Badge>,
+    },
+    {
+      key: 'entity',
+      label: t('columns.entity'),
+      sortable: true,
+      width: 160,
+      render: (log) => (
+        <span className="text-xs text-slate-400">
+          {log.entity}
+          <span className="ml-1 font-mono text-[10px] text-slate-600">{log.entity_id.slice(0, 8)}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'detail',
+      label: t('columns.detail'),
+      minWidth: 220,
+      render: (log) => <span className="text-xs text-slate-400">{log.detail || '—'}</span>,
+    },
+    {
+      key: 'ip',
+      label: t('columns.ip'),
+      width: 140,
+      render: (log) => <span className="font-mono text-[11px] text-slate-500">{log.ip || '—'}</span>,
+    },
+  ];
+
   return (
     <div>
-      <PageHeader title="Audit log" description="Every mutation performed through the panel, newest first." />
+      <PageHeader title={t('title')} description={t('description')} />
       {error && <ErrorBox message={error} />}
       {!logs ? (
         <div className="flex justify-center py-16 text-slate-400">
@@ -26,41 +113,45 @@ export default function AuditPage() {
         </div>
       ) : logs.length === 0 ? (
         <div className="card">
-          <EmptyState icon={<ScrollText className="h-8 w-8" />} title="Nothing logged yet" />
+          <EmptyState icon={<ScrollText className="h-8 w-8" />} title={t('empty')} />
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full">
-            <thead className="border-b border-surface-700/70 bg-surface-900/60">
-              <tr>
-                <th className="th">When</th>
-                <th className="th">Actor</th>
-                <th className="th">Action</th>
-                <th className="th">Entity</th>
-                <th className="th">Detail</th>
-                <th className="th">IP</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-800">
-              {logs.map((log) => (
-                <tr key={log.id} className="hover:bg-surface-900/40">
-                  <td className="td whitespace-nowrap text-xs text-slate-400">
-                    {new Date(log.created_at).toLocaleString()}
-                  </td>
-                  <td className="td text-xs">{log.actor_email || '—'}</td>
-                  <td className="td">
-                    <Badge tone="blue">{log.action}</Badge>
-                  </td>
-                  <td className="td text-xs text-slate-400">
-                    {log.entity}
-                    <span className="ml-1 font-mono text-[10px] text-slate-600">{log.entity_id.slice(0, 8)}</span>
-                  </td>
-                  <td className="td max-w-xs truncate text-xs text-slate-400">{log.detail || '—'}</td>
-                  <td className="td font-mono text-[11px] text-slate-500">{log.ip || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="card">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <input
+              className="field !w-64 !py-1.5 text-xs"
+              placeholder={tc('search')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <FilterToggle
+              open={showFilters}
+              count={filterCount(filters)}
+              onClick={() => setShowFilters((v) => !v)}
+            />
+            <span className="text-[11px] text-slate-500">{tc('rows_found', { count: rows.length })}</span>
+            {total > (logs?.length ?? 0) && (
+              <span className="text-[11px] text-amber-300/80">
+                {t('truncated', { shown: logs?.length ?? 0, total })}
+              </span>
+            )}
+          </div>
+
+          {showFilters && (
+            <div className="mb-3">
+              <QueryBuilder fields={fields} value={filters} onChange={setFilters} />
+            </div>
+          )}
+
+          <DataTable
+            tableId="audit"
+            data={rows}
+            columns={columns}
+            keyField="id"
+            emptyMessage={tc('no_match')}
+            initialSort={{ field: 'created_at', direction: 'desc' }}
+            initialPageSize={25}
+          />
         </div>
       )}
     </div>

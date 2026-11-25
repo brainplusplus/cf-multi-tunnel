@@ -1,0 +1,86 @@
+{
+  "title": { "id": "Pengaturan", "en": "Settings" },
+  "description": { "id": "Panel exposure dan runtime connector.", "en": "Panel exposure and the connector runtime." },
+  "exposure": {
+    "title": { "id": "Panel exposure", "en": "Panel exposure" },
+    "description": {
+      "id": "Publikasikan dashboard ini lewat tunnel di server ini, supaya bisa dibuka dari hostname, bukan port.",
+      "en": "Publish this dashboard through a tunnel on this server so you can open it from a hostname instead of a port."
+    },
+    "account": { "id": "Akun", "en": "Account" },
+    "account_hint": {
+      "id": "Filter opsional. Panel hanya bisa dipublikasikan lewat tunnel dengan token API.",
+      "en": "Optional filter. The panel can only be published through a tunnel with an API token."
+    },
+    "tunnel": { "id": "Tunnel", "en": "Tunnel" },
+    "tunnel_hint": {
+      "id": "Hanya tunnel yang terpasang di server ini. Connector di perangkat lain tidak bisa menjangkau panel lewat jaringan Docker.",
+      "en": "Only tunnels installed on this server. A connector on another device cannot reach the panel over the Docker network."
+    },
+    "no_local_tunnel": {
+      "id": "Belum ada tunnel di server ini. Buat satu di halaman Tunnel dengan penempatan “Server ini”.",
+      "en": "No tunnel on this server yet. Create one on the Tunnels page with the “This server” placement."
+    },
+    "remote_warning": {
+      "id": "Exposure ini memakai tunnel di perangkat lain ({{name}}). Itu hanya bekerja jika perangkat tersebut bisa menjangkau {{service}}. Pindahkan ke tunnel di server ini bila ragu.",
+      "en": "This exposure uses a tunnel on another device ({{name}}). That only works if the device can reach {{service}}. Move it to a tunnel on this server if unsure."
+    },
+    "subdomain": { "id": "Subdomain", "en": "Subdomain" },
+    "domain": { "id": "Domain", "en": "Domain" },
+    "service_url": { "id": "Service URL", "en": "Service URL" },
+    "service_auto": {
+      "id": "Diatur otomatis: container connector menjangkau panel lewat jaringan Docker.",
+      "en": "Set automatically: the connector container reaches the panel on the Docker network."
+    },
+    "will_publish": { "id": "Akan dipublikasikan sebagai", "en": "Will be published as" },
+    "publish": { "id": "Publikasikan panel", "en": "Publish panel" },
+    "update": { "id": "Simpan perubahan", "en": "Save changes" },
+    "remove": { "id": "Hapus", "en": "Remove" },
+    "remove_confirm": {
+      "id": "Hapus publikasi panel? DNS dan ingress dibersihkan.",
+      "en": "Remove the public panel exposure? DNS and ingress are cleaned up."
+    },
+    "removed": { "id": "Publikasi panel dihapus", "en": "Panel exposure removed" },
+    "saved": { "id": "Panel exposure disimpan", "en": "Panel exposure saved" },
+    "select_tunnel": { "id": "Pilih tunnel", "en": "Select a tunnel" },
+    "all_accounts": { "id": "Semua akun", "en": "All accounts" },
+    "no_zones": {
+      "id": "Belum ada zona tersimpan untuk akun ini; sinkronkan zona di halaman Akun.",
+      "en": "No zone cached for this account; sync zones on the Accounts page first."
+    }
+  },
+  "connector": {
+    "title": { "id": "Runtime connector", "en": "Connector runtime" },
+    "description": {
+      "id": "cloudflared berjalan sebagai satu container per tunnel. Memperbarui image akan membuat ulang container tanpa menyentuh data Anda.",
+      "en": "cloudflared runs as one container per tunnel. Updating the image recreates them without touching your data."
+    },
+    "check": { "id": "Periksa", "en": "Check" },
+    "mode": { "id": "Mode", "en": "Mode" },
+    "docker": { "id": "Docker", "en": "Docker" },
+    "installed": { "id": "Terpasang", "en": "Installed" },
+    "latest": { "id": "Terbaru", "en": "Latest" },
+    "active_image": { "id": "Image aktif", "en": "Active image" },
+    "target_image": { "id": "Image target", "en": "Target image" },
+    "target_hint": {
+      "id": "Tag apa pun dari cloudflare/cloudflared, mis. cloudflare/cloudflared:latest atau versi tertentu.",
+      "en": "Any tag from cloudflare/cloudflared, e.g. cloudflare/cloudflared:latest or a pinned version."
+    },
+    "browse_tags": { "id": "Lihat tag", "en": "Browse tags" },
+    "remember": { "id": "Ingat image ini untuk start berikutnya", "en": "Remember this image for future starts" },
+    "pull_recreate": { "id": "Tarik & buat ulang", "en": "Pull & recreate" },
+    "unreachable": { "id": "tidak terjangkau", "en": "unreachable" },
+    "unknown": { "id": "tidak diketahui", "en": "unknown" },
+    "use_latest": { "id": "Pakai {{version}}", "en": "Use {{version}}" },
+    "tags_fetched": { "id": "Tag diambil dari Docker Hub", "en": "Fetched published tags from Docker Hub" },
+    "update_confirm": {
+      "id": "Tarik image dan buat ulang semua connector yang dikelola? Tunnel akan tersambung ulang otomatis.",
+      "en": "Pull the image and recreate every managed connector? Tunnels reconnect automatically."
+    },
+    "update_done": { "id": "Diperbarui ke {{version}}. {{count}} connector dibuat ulang.", "en": "Updated to {{version}}. {{count}} connector(s) recreated." },
+    "update_failed_count": { "id": ", {{count}} gagal", "en": ", {{count}} failed" },
+    "tunnel": { "id": "Tunnel", "en": "Tunnel" },
+    "running_version": { "id": "Versi berjalan", "en": "Running version" },
+    "image_ref": { "id": "Referensi image", "en": "Image ref" }
+  }
+}

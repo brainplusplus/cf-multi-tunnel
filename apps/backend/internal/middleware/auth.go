@@ -33,7 +33,12 @@ func Auth(auth *services.AuthService) echo.MiddlewareFunc {
 				return c.JSON(http.StatusUnauthorized, map[string]string{"code": "unauthorized", "message": "account is not active"})
 			}
 
-			c.Set(callerKey, services.Caller{ID: user.ID, Email: user.Email, Admin: user.IsAdmin()})
+			c.Set(callerKey, services.Caller{
+				ID:             user.ID,
+				Email:          user.Email,
+				Admin:          user.IsAdmin(),
+				ImpersonatedBy: claims.ImpersonatedBy,
+			})
 			return next(c)
 		}
 	}

@@ -1,0 +1,72 @@
+{
+  "title": { "id": "Pengguna", "en": "Users" },
+  "description": {
+    "id": "Admin mengelola semuanya. Pengguna hanya melihat akun dan tunnel miliknya sendiri.",
+    "en": "Admins manage everything. Users only ever see accounts and tunnels they own."
+  },
+  "search_placeholder": { "id": "Cari email atau nama", "en": "Search email or name" },
+  "new_user": { "id": "Pengguna baru", "en": "New user" },
+  "edit_user": { "id": "Ubah pengguna", "en": "Edit user" },
+  "create_user": { "id": "Buat pengguna", "en": "Create user" },
+  "you": { "id": "Anda", "en": "you" },
+  "no_users": { "id": "Belum ada pengguna", "en": "No users yet" },
+  "user_updated": { "id": "Pengguna diperbarui", "en": "User updated" },
+  "user_created": { "id": "Pengguna dibuat", "en": "User created" },
+  "truncated": {
+    "id": "Menampilkan {{shown}} dari {{total}} pengguna; saring untuk mempersempit.",
+    "en": "Showing {{shown}} of {{total}} users; narrow the search to see the rest."
+  },
+  "create": { "id": "Buat", "en": "Create" },
+  "columns": {
+    "name": { "id": "Nama", "en": "Name" },
+    "email": { "id": "Email", "en": "Email" },
+    "role": { "id": "Peran", "en": "Role" },
+    "status": { "id": "Status", "en": "Status" },
+    "created": { "id": "Dibuat", "en": "Created" },
+    "impersonate": { "id": "Masuk sebagai", "en": "Impersonate" }
+  },
+  "fields": {
+    "name": { "id": "Nama", "en": "Name" },
+    "email": { "id": "Email", "en": "Email" },
+    "password": { "id": "Kata sandi", "en": "Password" },
+    "new_password": { "id": "Kata sandi baru", "en": "New password" },
+    "role": { "id": "Peran", "en": "Role" },
+    "keep_password": { "id": "Biarkan kosong untuk mempertahankan kata sandi saat ini.", "en": "Leave empty to keep the current password." },
+    "password_hint": { "id": "Minimal 8 karakter.", "en": "At least 8 characters." },
+    "role_user": { "id": "user — hanya mengelola akun sendiri", "en": "user — manages own accounts only" },
+    "role_admin": { "id": "admin — mengelola semuanya", "en": "admin — manages everything" }
+  },
+  "status": {
+    "active": { "id": "aktif", "en": "active" },
+    "inactive": { "id": "nonaktif", "en": "inactive" },
+    "disabled_badge": { "id": "nonaktif", "en": "disabled" }
+  },
+  "actions": {
+    "enable": { "id": "Aktifkan", "en": "Enable" },
+    "disable": { "id": "Nonaktifkan", "en": "Disable" },
+    "delete_confirm": { "id": "Hapus {{email}}? Tindakan ini tidak bisa dibatalkan.", "en": "Delete {{email}}? This cannot be undone." },
+    "enabled_toast": { "id": "Pengguna diaktifkan", "en": "User enabled" },
+    "disabled_toast": { "id": "Pengguna dinonaktifkan", "en": "User disabled" },
+    "deleted_toast": { "id": "Pengguna dihapus", "en": "User deleted" }
+  },
+  "impersonate": {
+    "label": { "id": "Masuk sebagai", "en": "Impersonate" },
+    "self": { "id": "Anda", "en": "You" },
+    "confirm": {
+      "id": "Masuk sebagai {{name}}? Anda akan melihat panel seperti pengguna ini, tanpa hak admin.",
+      "en": "Sign in as {{name}}? You will see the panel exactly as this user does, without admin rights."
+    },
+    "success": { "id": "Sekarang melihat sebagai {{name}}", "en": "Now viewing as {{name}}" },
+    "failed": { "id": "Gagal masuk sebagai pengguna itu", "en": "Could not impersonate that user" },
+    "exit": { "id": "Keluar dari mode lihat", "en": "Exit impersonation" },
+    "back_to": { "id": "Kembali ke {{email}}", "en": "Back to {{email}}" }
+  },
+  "filter": {
+    "name": { "id": "Nama", "en": "Name" },
+    "email": { "id": "Email", "en": "Email" },
+    "role": { "id": "Peran", "en": "Role" },
+    "active": { "id": "Status", "en": "Status" },
+    "active_yes": { "id": "aktif", "en": "active" },
+    "active_no": { "id": "nonaktif", "en": "disabled" }
+  }
+}

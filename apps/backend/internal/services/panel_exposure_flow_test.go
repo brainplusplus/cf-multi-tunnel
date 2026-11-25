@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -143,16 +144,16 @@ func newPanelFlowStack(t *testing.T) *panelFlowStack {
 // TestPublishingPanelLandsInTunnelAndAppList is the behaviour a user expects
 // when they publish the dashboard: one click, and the hostname shows up in the
 // tunnel's ingress and in Published apps — because it is the same row.
-//
-// The tunnel here is an imported one, i.e. it runs on another device, so the
-// service URL must default to PUBLIC_URL (an IP:port), which that connector can
-// actually reach.
 func TestPublishingPanelLandsInTunnelAndAppList(t *testing.T) {
 	s := newPanelFlowStack(t)
 	ctx := context.Background()
 
-	if s.tunnel.Location != "remote" {
-		t.Fatalf("imported tunnel location = %q, want remote", s.tunnel.Location)
+	// The panel lives on this server, so the exposing tunnel must too. An
+	// imported tunnel is remote by default; move it before publishing.
+	s.tunnel.Location = "local"
+	s.tunnel.ConnectorMode = "docker"
+	if err := s.tunnelDB.Update(ctx, s.tunnel); err != nil {
+		t.Fatalf("make tunnel local: %v", err)
 	}
 
 	app, err := s.apps.SetPanelExposure(ctx, s.caller, PanelExposureInput{
@@ -168,9 +169,8 @@ func TestPublishingPanelLandsInTunnelAndAppList(t *testing.T) {
 	if app.Hostname != "dash.example.com" {
 		t.Fatalf("hostname = %q, want dash.example.com", app.Hostname)
 	}
-	// Remote tunnel: PUBLIC_URL is this box's LAN IP, so no typing required.
-	if app.ServiceURL != "http://192.168.0.100:7777" {
-		t.Fatalf("service url = %q, want PUBLIC_URL", app.ServiceURL)
+	if app.ServiceURL != s.cfg.PanelInternalURL {
+		t.Fatalf("service url = %q, want %q", app.ServiceURL, s.cfg.PanelInternalURL)
 	}
 
 	// Tunnel detail page: ListByTunnel powers the hostname table.
@@ -207,27 +207,35 @@ func TestPublishingPanelLandsInTunnelAndAppList(t *testing.T) {
 	}
 }
 
-// A tunnel hosted by this panel must proxy to the Docker-network address, not to
-// PUBLIC_URL: from inside the connector container the public address is a round
-// trip through Cloudflare.
-func TestPublishingPanelFromLocalTunnelUsesDockerAddress(t *testing.T) {
+// A tunnel on another device must be refused rather than published with an
+// address it cannot reach: that produced a panel that only worked by accident.
+func TestPublishingPanelRejectsTunnelOnAnotherDevice(t *testing.T) {
 	s := newPanelFlowStack(t)
 	ctx := context.Background()
 
-	s.tunnel.Location = "local"
-	s.tunnel.ConnectorMode = "docker"
-	if err := s.tunnelDB.Update(ctx, s.tunnel); err != nil {
-		t.Fatalf("make tunnel local: %v", err)
+	if s.tunnel.Location != "remote" {
+		t.Fatalf("imported tunnel location = %q, want remote", s.tunnel.Location)
 	}
 
-	app, err := s.apps.SetPanelExposure(ctx, s.caller, PanelExposureInput{
+	_, err := s.apps.SetPanelExposure(ctx, s.caller, PanelExposureInput{
 		TunnelID: s.tunnel.ID, Subdomain: "dash", Domain: "example.com",
 	})
-	if err != nil {
-		t.Fatalf("publish panel: %v", err)
+	var appErr *AppError
+	if !errors.As(err, &appErr) || appErr.Status != 422 {
+		t.Fatalf("remote panel exposure = %v, want a 422 validation error", err)
 	}
-	if app.ServiceURL != s.cfg.PanelInternalURL {
-		t.Fatalf("service url = %q, want %q", app.ServiceURL, s.cfg.PanelInternalURL)
+	if appErr.Fields["tunnel_id"] == "" {
+		t.Fatalf("error does not name the tunnel field: %v", appErr.Fields)
+	}
+
+	// Nothing may be written: no ingress PUT, no DNS record.
+	s.fake.mu.Lock()
+	defer s.fake.mu.Unlock()
+	if len(s.fake.ingress) != 0 {
+		t.Fatalf("a rejected exposure still rewrote ingress: %s", s.fake.ingress)
+	}
+	if s.fake.dnsCalls != 0 {
+		t.Fatalf("a rejected exposure still created %d DNS record(s)", s.fake.dnsCalls)
 	}
 }
 

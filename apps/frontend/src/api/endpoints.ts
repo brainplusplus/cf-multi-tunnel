@@ -7,6 +7,11 @@ import type {
   CFZone,
   ConnectorStatus,
   DashboardStats,
+  DNSRecord,
+  DNSRecordPayload,
+  DNSSyncResult,
+  DNSZone,
+  ImpersonationResult,
   PanelAddress,
   PublishedApp,
   ReconcileResult,
@@ -23,6 +28,9 @@ export const authApi = {
   me: () => client.get<User>('/api/auth/me').then((r) => r.data),
   changePassword: (current: string, next: string) =>
     client.post('/api/auth/change-password', { current_password: current, new_password: next }),
+  impersonate: (userId: string) =>
+    client.post<ImpersonationResult>('/api/auth/impersonate', { user_id: userId }).then((r) => r.data),
+  exitImpersonation: () => client.post('/api/auth/exit-impersonation'),
 };
 
 // ── Dashboard ───────────────────────────────────────────────────────
@@ -60,6 +68,25 @@ export const accountsApi = {
   remove: (id: string) => client.delete(`/api/cf-accounts/${id}`),
   zones: (id: string) => client.get<CFZone[]>(`/api/cf-accounts/${id}/zones`).then((r) => r.data),
   syncZones: (id: string) => client.post<CFZone[]>(`/api/cf-accounts/${id}/sync-zones`).then((r) => r.data),
+};
+
+// ── DNS ─────────────────────────────────────────────────────────────
+// Records are read live from Cloudflare; only the zone list is cached.
+export const dnsApi = {
+  zones: () => client.get<{ items: DNSZone[] }>('/api/dns/zones').then((r) => r.data.items),
+  syncZones: () => client.post<DNSSyncResult>('/api/dns/zones/sync').then((r) => r.data),
+  records: (zoneRowId: string) =>
+    client
+      .get<{ items: DNSRecord[]; truncated: boolean }>(`/api/dns/zones/${zoneRowId}/records`)
+      .then((r) => r.data),
+  createRecord: (zoneRowId: string, payload: DNSRecordPayload) =>
+    client.post<DNSRecord>(`/api/dns/zones/${zoneRowId}/records`, payload).then((r) => r.data),
+  updateRecord: (zoneRowId: string, recordId: string, payload: DNSRecordPayload) =>
+    client
+      .put<DNSRecord>(`/api/dns/zones/${zoneRowId}/records/${recordId}`, payload)
+      .then((r) => r.data),
+  deleteRecord: (zoneRowId: string, recordId: string) =>
+    client.delete(`/api/dns/zones/${zoneRowId}/records/${recordId}`),
 };
 
 // ── Tunnels ─────────────────────────────────────────────────────────

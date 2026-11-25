@@ -311,12 +311,90 @@ func (c *Client) PutTunnelConfig(ctx context.Context, accountID, tunnelID string
 // ── DNS ──────────────────────────────────────────────────────────────
 
 type DNSRecord struct {
-	ID      string `json:"id"`
-	Type    string `json:"type"`
-	Name    string `json:"name"`
-	Content string `json:"content"`
-	Proxied bool   `json:"proxied"`
-	TTL     int    `json:"ttl"`
+	ID         string         `json:"id"`
+	Type       string         `json:"type"`
+	Name       string         `json:"name"`
+	Content    string         `json:"content"`
+	Proxied    bool           `json:"proxied"`
+	Proxiable  bool           `json:"proxiable"`
+	TTL        int            `json:"ttl"`
+	Priority   *int           `json:"priority,omitempty"`
+	Comment    string         `json:"comment"`
+	Tags       []string       `json:"tags"`
+	CreatedOn  string         `json:"created_on"`
+	ModifiedOn string         `json:"modified_on"`
+	Data       *DNSRecordData `json:"data,omitempty"`
+}
+
+// DNSRecordData carries the structured fields Cloudflare requires for record
+// types that are not a plain name/content pair (SRV and CAA).
+type DNSRecordData struct {
+	Priority *int   `json:"priority,omitempty"`
+	Weight   *int   `json:"weight,omitempty"`
+	Port     *int   `json:"port,omitempty"`
+	Target   string `json:"target,omitempty"`
+	Flags    *int   `json:"flags,omitempty"`
+	Tag      string `json:"tag,omitempty"`
+	Value    string `json:"value,omitempty"`
+}
+
+// DNSRecordInput is what Create/Update send. Content is empty for SRV/CAA,
+// where Cloudflare reads Data instead.
+type DNSRecordInput struct {
+	Type     string         `json:"type"`
+	Name     string         `json:"name"`
+	Content  string         `json:"content,omitempty"`
+	TTL      int            `json:"ttl,omitempty"`
+	Proxied  *bool          `json:"proxied,omitempty"`
+	Priority *int           `json:"priority,omitempty"`
+	Comment  string         `json:"comment,omitempty"`
+	Tags     []string       `json:"tags,omitempty"`
+	Data     *DNSRecordData `json:"data,omitempty"`
+}
+
+// ListAllDNSRecords walks Cloudflare's pages so the DNS page can show and
+// filter the whole zone. Truncated is true when the zone has more records than
+// the page cap; the UI says so instead of silently hiding the rest.
+func (c *Client) ListAllDNSRecords(ctx context.Context, zoneID string) ([]DNSRecord, bool, error) {
+	const perPage = 100
+	const maxPages = 20
+
+	var all []DNSRecord
+	for page := 1; page <= maxPages; page++ {
+		var out []DNSRecord
+		path := fmt.Sprintf("/zones/%s/dns_records?per_page=%d&page=%d", url.PathEscape(zoneID), perPage, page)
+		info, err := c.do(ctx, http.MethodGet, path, nil, &out)
+		if err != nil {
+			return nil, false, err
+		}
+		all = append(all, out...)
+		if len(out) < perPage {
+			return all, false, nil
+		}
+		if info != nil && info.TotalPages > 0 && page >= info.TotalPages {
+			return all, false, nil
+		}
+	}
+	return all, true, nil
+}
+
+func (c *Client) CreateDNSRecord(ctx context.Context, zoneID string, in DNSRecordInput) (*DNSRecord, error) {
+	path := fmt.Sprintf("/zones/%s/dns_records", url.PathEscape(zoneID))
+	var created DNSRecord
+	if _, err := c.do(ctx, http.MethodPost, path, in, &created); err != nil {
+		return nil, err
+	}
+	return &created, nil
+}
+
+func (c *Client) UpdateDNSRecord(ctx context.Context, zoneID, recordID string, in DNSRecordInput) (*DNSRecord, error) {
+	path := fmt.Sprintf("/zones/%s/dns_records/%s", url.PathEscape(zoneID), url.PathEscape(recordID))
+	var updated DNSRecord
+	// PATCH so a partial payload does not clear fields the panel does not edit.
+	if _, err := c.do(ctx, http.MethodPatch, path, in, &updated); err != nil {
+		return nil, err
+	}
+	return &updated, nil
 }
 
 func (c *Client) ListDNSRecords(ctx context.Context, zoneID, name string) ([]DNSRecord, error) {

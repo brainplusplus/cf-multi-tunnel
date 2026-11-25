@@ -46,6 +46,9 @@ func Setup(e *echo.Echo, dbConn *gorm.DB, cfg *config.Config, enc *cryptox.Ciphe
 	accountSvc := services.NewAccountService(accountRepo, zoneRepo, tunnelRepo, appRepo, cf, auditSvc, connectorSvc)
 	tunnelSvc := services.NewTunnelService(tunnelRepo, accountRepo, zoneRepo, appRepo, cf, auditSvc, connectorSvc, cfg)
 	appSvc := services.NewAppService(appRepo, tunnelRepo, accountRepo, zoneRepo, tunnelSvc, cf, auditSvc, cfg)
+	// DNSService reuses AccountService.SyncZones so "Sync" on the DNS page means
+	// the same thing as syncing zones from an account.
+	dnsSvc := services.NewDNSService(accountRepo, zoneRepo, tunnelRepo, appRepo, accountSvc, cf, auditSvc)
 	// Adding or upgrading a token must pull in the tunnels and hostnames that
 	// already exist on Cloudflare. Wired here because the tunnel service is
 	// built after the account service.
@@ -62,6 +65,7 @@ func Setup(e *echo.Echo, dbConn *gorm.DB, cfg *config.Config, enc *cryptox.Ciphe
 	dashboardH := handlers.NewDashboardHandler(dashboardSvc, connectorSvc)
 	connectorH := handlers.NewConnectorHandler(connectorSvc)
 	auditH := handlers.NewAuditHandler(auditSvc)
+	dnsH := handlers.NewDNSHandler(dnsSvc)
 
 	// ── Routes ──────────────────────────────────────────────────────
 	api := e.Group("/api")
@@ -72,6 +76,10 @@ func Setup(e *echo.Echo, dbConn *gorm.DB, cfg *config.Config, enc *cryptox.Ciphe
 	auth.POST("/logout", authH.Logout)
 	auth.GET("/me", authH.Me, middleware.Auth(authSvc))
 	auth.POST("/change-password", authH.ChangePassword, middleware.Auth(authSvc))
+	// Admin only, but outside /admin: the impersonated session itself must be
+	// able to end, which a normal user's token would not be allowed to do.
+	auth.POST("/impersonate", authH.Impersonate, middleware.Auth(authSvc), middleware.AdminOnly)
+	auth.POST("/exit-impersonation", authH.ExitImpersonation, middleware.Auth(authSvc))
 
 	protected := api.Group("", middleware.Auth(authSvc))
 
@@ -110,6 +118,16 @@ func Setup(e *echo.Echo, dbConn *gorm.DB, cfg *config.Config, enc *cryptox.Ciphe
 	protected.DELETE("/apps/:id", appH.Delete)
 	protected.PATCH("/apps/:id/enabled", appH.SetEnabled)
 	protected.POST("/apps/:id/retry", appH.Retry)
+
+	// DNS. Records are read live from Cloudflare; only the zone list is cached.
+	// Ownership is re-checked in the service, so the same routes work for a
+	// normal user looking at their own zones.
+	protected.GET("/dns/zones", dnsH.Zones)
+	protected.POST("/dns/zones/sync", dnsH.SyncZones)
+	protected.GET("/dns/zones/:zoneID/records", dnsH.Records)
+	protected.POST("/dns/zones/:zoneID/records", dnsH.CreateRecord)
+	protected.PUT("/dns/zones/:zoneID/records/:recordID", dnsH.UpdateRecord)
+	protected.DELETE("/dns/zones/:zoneID/records/:recordID", dnsH.DeleteRecord)
 
 	// Panel exposure is admin-only: it republishes the control plane itself.
 	protected.GET("/settings/panel-address", appH.GetPanelAddress, middleware.AdminOnly)

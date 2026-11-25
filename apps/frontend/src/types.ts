@@ -7,12 +7,28 @@ export interface User {
   role: Role;
   is_active: boolean;
   created_at: string;
+  // Set by /api/auth/me while an admin is impersonating this account.
+  impersonated_by?: string;
 }
 
 export interface AuthResult {
   access_token: string;
   refresh_token: string;
   expires_in: number;
+  user: User;
+}
+
+export interface ImpersonationResult {
+  access_token: string;
+  expires_in: number;
+  user: User;
+  original_user: User;
+}
+
+/** The admin session a browser must return to when impersonation ends. */
+export interface ImpersonationSnapshot {
+  access_token: string;
+  refresh_token: string;
   user: User;
 }
 
@@ -47,6 +63,77 @@ export interface CFZone {
   name: string;
   status: string;
   synced_at: string;
+}
+
+// A zone plus its account, returned by the DNS page so one dropdown can group
+// domains per account without a request per account.
+export interface DNSZone {
+  id: string;
+  zone_id: string;
+  name: string;
+  status: string;
+  cf_account_id: string;
+  account_name: string;
+  has_api: boolean;
+  synced_at: string;
+}
+
+// A live Cloudflare record. display_type is "Tunnel" when a CNAME points at
+// <tunnel-id>.cfargotunnel.com, which is how the Cloudflare dashboard labels it.
+export interface DNSRecord {
+  id: string;
+  type: string;
+  name: string;
+  content: string;
+  proxied: boolean;
+  proxiable: boolean;
+  ttl: number;
+  priority?: number | null;
+  comment: string;
+  tags?: string[] | null;
+  created_on: string;
+  modified_on: string;
+  data?: {
+    priority?: number | null;
+    weight?: number | null;
+    port?: number | null;
+    target?: string;
+    flags?: number | null;
+    tag?: string;
+    value?: string;
+  } | null;
+  zone_id: string;
+  zone_name: string;
+  display_type: string;
+  managed: boolean;
+  tunnel_id?: string;
+  tunnel_name?: string;
+  app_id?: string;
+  hostname?: string;
+}
+
+export interface DNSRecordPayload {
+  type: string;
+  name?: string;
+  content?: string;
+  ttl: number;
+  proxied?: boolean;
+  priority?: number;
+  comment?: string;
+  service?: string;
+  protocol?: string;
+  weight?: number;
+  port?: number;
+  target?: string;
+  flags?: number;
+  tag?: string;
+  value?: string;
+}
+
+export interface DNSSyncResult {
+  accounts: number;
+  zones: number;
+  failed: string[];
 }
 
 export type ConnectorMode = 'docker' | 'external';
@@ -103,8 +190,6 @@ export interface PublishedApp {
 export interface PanelAddress {
   public_url: string;
   internal_url: string;
-  /** Empty when PUBLIC_URL is a DNS name, which would loop through the tunnel. */
-  remote_service_url: string;
 }
 
 export interface DashboardStats {

@@ -83,6 +83,22 @@ func (r *ZoneRepository) ListByAccount(ctx context.Context, accountID string) ([
 	return zones, err
 }
 
+// List returns every cached zone. The DNS page filters them by the accounts the
+// caller can actually reach, so it does not need a second query per account.
+func (r *ZoneRepository) List(ctx context.Context) ([]models.CFZone, error) {
+	var zones []models.CFZone
+	err := r.db.WithContext(ctx).Order("name ASC").Find(&zones).Error
+	return zones, err
+}
+
+func (r *ZoneRepository) FindByID(ctx context.Context, id string) (*models.CFZone, error) {
+	var z models.CFZone
+	if err := r.db.WithContext(ctx).First(&z, "id = ?", id).Error; err != nil {
+		return nil, normalizeErr(err)
+	}
+	return &z, nil
+}
+
 func (r *ZoneRepository) ReplaceForAccount(ctx context.Context, accountID string, zones []models.CFZone) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("cf_account_id = ?", accountID).Delete(&models.CFZone{}).Error; err != nil {

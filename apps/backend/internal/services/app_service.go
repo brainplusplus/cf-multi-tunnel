@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
-	"net/url"
 	"strings"
 
 	"cf-multi-tunnel/backend/internal/config"
@@ -390,52 +388,6 @@ type PanelExposureInput struct {
 	Hostname  string `json:"hostname"`
 	Subdomain string `json:"subdomain"`
 	Domain    string `json:"domain"`
-	// ServiceURL is only used when the tunnel runs on another device. For a
-	// local tunnel the panel's own Docker-network address is used.
-	ServiceURL string `json:"service_url"`
-}
-
-// checkNoLoop refuses a service URL that resolves back to the hostname being
-// published. Without this, a remote connector would proxy the panel to itself
-// and the site would hang instead of returning a clear error.
-func checkNoLoop(serviceURL string, in PanelExposureInput, publicURL string) error {
-	u, err := url.Parse(serviceURL)
-	if err != nil || u.Host == "" {
-		return Validation(map[string]string{"service_url": "must be an absolute URL such as http://192.168.1.10:7777"})
-	}
-	target := u.Hostname()
-	hostname := strings.TrimSpace(in.Hostname)
-	if hostname == "" && in.Subdomain != "" && in.Domain != "" {
-		hostname = in.Subdomain + "." + in.Domain
-	}
-	if hostname != "" && strings.EqualFold(target, hostname) {
-		return Validation(map[string]string{
-			"service_url": "points at the hostname being published; use the panel's own reachable address instead",
-		})
-	}
-	// An IP literal can never be a Cloudflare hostname, so pointing a remote
-	// connector at the panel's own LAN address is legitimate even when
-	// PUBLIC_URL uses that same IP (the normal single-host install). Only a DNS
-	// name can loop back through the tunnel.
-	if net.ParseIP(target) == nil {
-		if pub, err := url.Parse(publicURL); err == nil && pub.Hostname() != "" && strings.EqualFold(target, pub.Hostname()) {
-			return Validation(map[string]string{
-				"service_url": "points at PUBLIC_URL, which is this same panel; a remote connector cannot reach it that way",
-			})
-		}
-	}
-	return nil
-}
-
-// remotePanelServiceURL is the address a connector on another device can use to
-// reach this panel, derived from PUBLIC_URL. It returns "" when PUBLIC_URL is a
-// DNS name, because that name is served by the tunnel itself and would loop.
-func remotePanelServiceURL(publicURL string) string {
-	u, err := url.Parse(strings.TrimSpace(publicURL))
-	if err != nil || u.Host == "" || net.ParseIP(u.Hostname()) == nil {
-		return ""
-	}
-	return u.Scheme + "://" + u.Host
 }
 
 // PanelAddress is what the Settings page needs to fill the exposure form
@@ -443,40 +395,33 @@ func remotePanelServiceURL(publicURL string) string {
 type PanelAddress struct {
 	PublicURL   string `json:"public_url"`
 	InternalURL string `json:"internal_url"`
-	// RemoteServiceURL is empty when PUBLIC_URL is a hostname.
-	RemoteServiceURL string `json:"remote_service_url"`
 }
 
 func (s *AppService) PanelAddress() PanelAddress {
 	return PanelAddress{
-		PublicURL:        s.cfg.PublicURL,
-		InternalURL:      s.cfg.PanelInternalURL,
-		RemoteServiceURL: remotePanelServiceURL(s.cfg.PublicURL),
+		PublicURL:   s.cfg.PublicURL,
+		InternalURL: s.cfg.PanelInternalURL,
 	}
 }
 
-// resolvePanelServiceURL picks the origin the connector must proxy to. A local
-// connector reaches the panel over the Docker network. A connector on another
-// device cannot, so it needs the panel host's LAN/VPN address: the operator's
-// explicit value, or PUBLIC_URL when that is already an IP.
-func resolvePanelServiceURL(in PanelExposureInput, tunnelLocation, publicURL, internalURL string) (string, error) {
-	if tunnelLocation != "remote" {
-		return internalURL, nil
-	}
-	serviceURL := strings.TrimSpace(in.ServiceURL)
-	if serviceURL == "" {
-		serviceURL = remotePanelServiceURL(publicURL)
-	}
-	if serviceURL == "" {
+// resolvePanelServiceURL picks the origin the connector must proxy to.
+//
+// Only a tunnel installed on this server can carry the panel: the connector
+// container reaches the dashboard over the Docker network as
+// `http://reverse-proxy:7777`. A connector on another device cannot resolve that
+// name, and pointing it at PUBLIC_URL would route the request back through the
+// very tunnel being created, which hangs instead of erroring.
+func resolvePanelServiceURL(tunnelLocation, internalURL string) (string, error) {
+	if tunnelLocation != "local" {
 		return "", Validation(map[string]string{
-			"service_url": "required for a tunnel on another device: enter the panel host's LAN/VPN address " +
-				"(PUBLIC_URL is a hostname, so it cannot be reused here)",
+			"tunnel_id": "the panel can only be published through a tunnel installed on this server " +
+				"(placement \"This server\"); a connector on another device cannot reach it",
 		})
 	}
-	if err := checkNoLoop(serviceURL, in, publicURL); err != nil {
-		return "", err
+	if strings.TrimSpace(internalURL) == "" {
+		return "", BadRequest("PANEL_INTERNAL_URL is not configured, so the connector has no address for the panel")
 	}
-	return serviceURL, nil
+	return internalURL, nil
 }
 
 func (s *AppService) GetPanelExposure(ctx context.Context) (*models.PublishedApp, error) {
@@ -509,13 +454,9 @@ func (s *AppService) SetPanelExposure(ctx context.Context, caller Caller, in Pan
 	if !tunnel.RemoteConfigurable() {
 		return nil, BadRequest("the panel can only be published through a tunnel with an API token (config_src=cloudflare)")
 	}
-	// The service URL depends on where the connector runs. A local container
-	// reaches the panel over the Docker network. A connector on another device
-	// can only reach it over the network — and must NOT be handed the public
-	// hostname being created here, or every request would loop back into the
-	// tunnel. So remote exposure requires a loopback-free address, defaulting to
-	// PUBLIC_URL when that is already an IP.
-	serviceURL, err := resolvePanelServiceURL(in, tunnel.Location, s.cfg.PublicURL, s.cfg.PanelInternalURL)
+	// The service URL is derived, never typed: a local connector reaches the
+	// panel over the Docker network, and no other placement is allowed.
+	serviceURL, err := resolvePanelServiceURL(tunnel.Location, s.cfg.PanelInternalURL)
 	if err != nil {
 		return nil, err
 	}

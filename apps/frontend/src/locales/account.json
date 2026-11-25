@@ -1,0 +1,16 @@
+{
+  "title": { "id": "Akun saya", "en": "My account" },
+  "description": { "id": "Detail masuk Anda untuk panel ini.", "en": "Your sign-in details for this panel." },
+  "role": { "id": "peran: {{role}}", "en": "role: {{role}}" },
+  "change_password": { "id": "Ubah kata sandi", "en": "Change password" },
+  "current_password": { "id": "Kata sandi saat ini", "en": "Current password" },
+  "new_password": { "id": "Kata sandi baru", "en": "New password" },
+  "confirm_password": { "id": "Ulangi kata sandi baru", "en": "Repeat new password" },
+  "submit": { "id": "Perbarui kata sandi", "en": "Update password" },
+  "changed": {
+    "id": "Kata sandi diperbarui. Sesi lain tetap berjalan sampai token-nya kedaluwarsa.",
+    "en": "Password changed. Other sessions keep working until their token expires."
+  },
+  "mismatch": { "id": "tidak sama", "en": "does not match" },
+  "min_length": { "id": "Minimal 8 karakter.", "en": "At least 8 characters." }
+}

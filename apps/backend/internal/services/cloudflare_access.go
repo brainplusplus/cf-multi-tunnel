@@ -152,6 +152,10 @@ type Caller struct {
 	ID    string
 	Email string
 	Admin bool
+	// ImpersonatedBy is the admin behind this session, empty for a normal login.
+	// Services that audit a destructive action include it so the log names the
+	// person actually responsible, not only the account being acted as.
+	ImpersonatedBy string
 }
 
 func (c Caller) Actor() db.Actor { return db.Actor{UserID: c.ID, Admin: c.Admin} }

@@ -1,0 +1,10 @@
+{
+  "panel_title": { "id": "CF Tunnel Panel", "en": "CF Tunnel Panel" },
+  "panel_subtitle": {
+    "id": "Kelola tunnel Cloudflare lintas akun",
+    "en": "Manage Cloudflare tunnels across accounts"
+  },
+  "email": { "id": "Email", "en": "Email" },
+  "password": { "id": "Kata sandi", "en": "Password" },
+  "submit": { "id": "Masuk", "en": "Sign in" }
+}

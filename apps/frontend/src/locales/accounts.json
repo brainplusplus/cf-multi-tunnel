@@ -1,0 +1,146 @@
+{
+  "title": { "id": "Akun Cloudflare", "en": "Cloudflare accounts" },
+  "description": {
+    "id": "Setiap akun adalah satu set kredensial. Pengguna hanya melihat miliknya; admin melihat semuanya.",
+    "en": "Each account is a credential set. Users only see their own; admins see everything."
+  },
+  "new_account": { "id": "Tambah token API", "en": "Add API token" },
+  "import_tunnel": { "id": "Impor token tunnel", "en": "Import tunnel token" },
+  "refresh": { "id": "Muat ulang", "en": "Refresh" },
+  "columns": {
+    "name": { "id": "Akun", "en": "Account" },
+    "credential": { "id": "Kredensial", "en": "Credential" },
+    "status": { "id": "Status", "en": "Status" },
+    "tunnels": { "id": "Tunnel", "en": "Tunnels" },
+    "actions": { "id": "Aksi", "en": "Actions" }
+  },
+  "credential": {
+    "api": { "id": "Token API", "en": "API token" },
+    "token_import": { "id": "Token tunnel", "en": "tunnel token" },
+    "attach": { "id": "Pasang token API", "en": "Attach API token" }
+  },
+  "actions": {
+    "verify": { "id": "Verifikasi", "en": "Verify" },
+    "verified": { "id": "{{name}} terverifikasi", "en": "{{name}} verified" },
+    "view": { "id": "Lihat tunnel", "en": "View tunnels" },
+    "delete_confirm": {
+      "id": "Hapus akun {{name}}? Tunnel dan aplikasi publiknya juga dihapus dari panel.",
+      "en": "Delete account {{name}}? Its tunnels and published apps are removed from the panel."
+    },
+    "deleted": { "id": "Akun dihapus", "en": "Account deleted" }
+  },
+  "empty": { "id": "Belum ada akun Cloudflare", "en": "No Cloudflare account yet" },
+  "empty_hint": {
+    "id": "Tambahkan token API dengan izin terbatas agar panel bisa membuat tunnel, mengatur ingress, dan menulis DNS untuk Anda.",
+    "en": "Add a scoped API token so the panel can create tunnels, push ingress and write DNS for you."
+  },
+  "empty_action": { "id": "Tambahkan akun pertama", "en": "Add your first account" },
+  "search": { "id": "Cari nama atau account ID", "en": "Search name or account ID" },
+  "filter": {
+    "name": { "id": "Akun", "en": "Account" },
+    "credential": { "id": "Kredensial", "en": "Credential" },
+    "status": { "id": "Status", "en": "Status" }
+  },
+  "fields": {
+    "display_name": { "id": "Nama tampilan", "en": "Display name" },
+    "display_name_hint": {
+      "id": "Opsional. Default-nya nama akun Cloudflare.",
+      "en": "Optional. Defaults to the Cloudflare account name."
+    },
+    "api_token": { "id": "Token API", "en": "API token" },
+    "api_token_hint": {
+      "id": "Harus bisa membaca akun Cloudflare ini dan tunnel-nya.",
+      "en": "Must be able to read this Cloudflare account and its tunnels."
+    },
+    "token_placeholder": { "id": "Tempel token", "en": "Paste the token" },
+    "account": { "id": "Akun Cloudflare", "en": "Cloudflare account" },
+    "account_detected": { "id": "Terdeteksi dari token.", "en": "Detected from the token." },
+    "account_multiple_hint": {
+      "id": "Token ini bisa melihat lebih dari satu akun. Pilih yang akan dikelola.",
+      "en": "This token can see more than one account. Pick the one to manage."
+    },
+    "account_select": { "id": "Pilih akun", "en": "Select an account" },
+    "account_already_added": { "id": "sudah ditambahkan", "en": "already added" },
+    "account_id": { "id": "Account ID", "en": "Account ID" },
+    "account_id_checking": { "id": "Memeriksa token…", "en": "Checking the token…" },
+    "account_id_hint": {
+      "id": "Tempel token di atas; daftar akun muncul setelah token terverifikasi.",
+      "en": "Paste the token above; the account list appears here once it verifies."
+    },
+    "account_id_placeholder": {
+      "id": "Terisi otomatis saat token terverifikasi",
+      "en": "Filled automatically when the token verifies"
+    },
+    "tunnel_name": { "id": "Nama tunnel", "en": "Tunnel name" },
+    "tunnel_name_hint": { "id": "Label opsional di dalam panel.", "en": "Optional label inside the panel." },
+    "tunnel_token": { "id": "Token tunnel", "en": "Tunnel token" },
+    "tunnel_token_hint": {
+      "id": "String panjang eyJ…, bukan token API.",
+      "en": "The long eyJ... string, not the API token."
+    },
+    "device_label": { "id": "Label perangkat", "en": "Device label" },
+    "device_label_hint": {
+      "id": "Di mana connector ini berjalan, agar mudah dibedakan nanti.",
+      "en": "Where this connector runs, so you can tell it apart later."
+    }
+  },
+  "permissions": {
+    "title": { "id": "Izin yang dibutuhkan — dua policy", "en": "Required permissions — two policies" },
+    "account_policy": { "id": "Account policy", "en": "Account policy" },
+    "zone_policy": { "id": "Zone policy", "en": "Zone policy" },
+    "tunnel_edit": { "id": "Cloudflare Tunnel · Edit", "en": "Cloudflare Tunnel · Edit" },
+    "settings_read": { "id": "Account Settings · Read", "en": "Account Settings · Read" },
+    "zone_read": { "id": "Zone · Read", "en": "Zone · Read" },
+    "dns_edit": { "id": "DNS · Edit", "en": "DNS · Edit" }
+  },
+  "attach": {
+    "title": { "id": "Pasang token API", "en": "Attach an API token" },
+    "description": {
+      "id": "Tingkatkan {{name}} di tempat. Tunnel yang sudah diimpor tetap ada; ingress dan DNS menjadi bisa diatur dari sini.",
+      "en": "Upgrade {{name}} in place. Its imported tunnels are kept; ingress and DNS become manageable from here."
+    },
+    "submit": { "id": "Pasang token", "en": "Attach token" },
+    "success": {
+      "id": "Token terpasang. Tunnel dan hostname yang sudah ada berhasil diimpor.",
+      "en": "Token attached. Existing tunnels and hostnames were imported."
+    },
+    "after": {
+      "id": "Setelah dipasang, panel mendaftar semua tunnel yang bisa dilihat token dan mengimpor hostname yang sudah ada di ingress tiap tunnel. Tidak ada yang dihapus.",
+      "en": "After attaching, the panel lists every tunnel the token can see and imports the hostnames already present in each tunnel's ingress. Nothing is deleted."
+    }
+  },
+  "add": {
+    "title": { "id": "Tambah akun Cloudflare", "en": "Add Cloudflare account" },
+    "description": {
+      "id": "Gunakan token API dengan izin terbatas. Panel memverifikasinya sebelum menyimpan, lalu menyimpannya terenkripsi.",
+      "en": "Use a scoped API token. The panel verifies it before saving and stores it encrypted."
+    },
+    "submit": { "id": "Tambah akun", "en": "Add account" },
+    "success": {
+      "id": "Akun {{name}} disimpan. Tunnel dan hostname yang sudah ada berhasil diimpor.",
+      "en": "Account {{name}} saved. Existing tunnels and their hostnames were imported."
+    }
+  },
+  "import": {
+    "title": { "id": "Impor tunnel yang sudah ada", "en": "Import an existing tunnel" },
+    "description": {
+      "id": "Tempel token yang dicetak oleh `cloudflared tunnel token <name>`. Tidak perlu token API.",
+      "en": "Paste the token printed by `cloudflared tunnel token <name>`. No API token required."
+    },
+    "submit": { "id": "Impor", "en": "Import" },
+    "success": { "id": "Tunnel {{name}} diimpor", "en": "Imported tunnel {{name}}" },
+    "where_title": { "id": "Dari mana token ini diambil", "en": "Where to get this token" },
+    "where_body": {
+      "id": "Cloudflare Zero Trust → Networks → Tunnels → buka (atau buat) tunnel → perintah instalasi untuk connector cloudflared memuatnya: --token eyJ… . Salin hanya bagian setelah --token.",
+      "en": "Cloudflare Zero Trust → Networks → Tunnels → open the tunnel (or create one) → the install command for the cloudflared connector contains it: --token eyJ... . Copy only the part after --token."
+    },
+    "where_body_existing": {
+      "id": "Di host yang sudah terpasang, Anda juga bisa menjalankan cloudflared tunnel token <name>, atau membacanya dari config.yml / credentials.json di perangkat itu.",
+      "en": "On an existing host you can also run cloudflared tunnel token <name>, or read it from that device's config.yml / credentials.json."
+    },
+    "remote_warning": {
+      "id": "Tunnel hasil impor dianggap remote: cloudflared dijalankan di perangkat itu. Akun dengan token tunnel tidak bisa mengirim ingress atau DNS lewat API, jadi panel membuat config.yml dan menunjukkan CNAME yang harus Anda buat. Pasang token API nanti untuk otomatisasi penuh.",
+      "en": "Imported tunnels are treated as remote: you run cloudflared on that device. A tunnel-token account cannot push ingress or DNS through the API, so the panel generates config.yml and shows the CNAME you must create. Attach an API token later to unlock full automation."
+    }
+  }
+}

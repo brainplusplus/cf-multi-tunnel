@@ -1,0 +1,19 @@
+{
+  "dashboard": { "id": "Dashboard", "en": "Dashboard" },
+  "accounts": { "id": "Akun", "en": "Accounts" },
+  "tunnels": { "id": "Tunnel", "en": "Tunnels" },
+  "apps": { "id": "Aplikasi publik", "en": "Published apps" },
+  "dns": { "id": "DNS", "en": "DNS" },
+  "users": { "id": "Pengguna", "en": "Users" },
+  "settings": { "id": "Pengaturan", "en": "Settings" },
+  "audit": { "id": "Log audit", "en": "Audit log" },
+  "account": { "id": "Akun saya", "en": "My account" },
+  "panel_title": { "id": "CF Tunnel", "en": "CF Tunnel" },
+  "panel_subtitle": { "id": "Panel kontrol", "en": "Control panel" },
+  "viewing_as": { "id": "Melihat sebagai", "en": "Viewing as" },
+  "exit_impersonation": { "id": "Keluar dari mode lihat", "en": "Exit impersonation" },
+  "impersonation_hint": {
+    "id": "Anda masuk sebagai pengguna lain. Tindakan tercatat atas nama admin yang memulai.",
+    "en": "You are signed in as another user. Actions are audited against the admin who started it."
+  }
+}

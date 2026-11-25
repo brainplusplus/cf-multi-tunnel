@@ -1,0 +1,53 @@
+{
+  "welcome": { "id": "Selamat datang, {{name}}", "en": "Welcome, {{name}}" },
+  "welcome_fallback": { "id": "Selamat datang", "en": "Welcome" },
+  "description": {
+    "id": "Semua tunnel, akun, dan hostname yang dapat Anda akses dari panel ini.",
+    "en": "Every tunnel, account and hostname you can reach from this panel."
+  },
+  "cards": {
+    "accounts": { "id": "Akun Cloudflare", "en": "Cloudflare accounts" },
+    "tunnels": { "id": "Tunnel", "en": "Tunnels" },
+    "apps": { "id": "Aplikasi publik", "en": "Published apps" },
+    "tunnels_hint": { "id": "{{count}} terhubung", "en": "{{count}} connected" },
+    "apps_hint": { "id": "{{count}} tersinkron", "en": "{{count}} synced" }
+  },
+  "hosted": {
+    "title": { "id": "Dijalankan panel ini", "en": "Hosted by this panel" },
+    "running": { "id": "{{running}}/{{total}} berjalan", "en": "{{running}}/{{total}} running" },
+    "hint": {
+      "id": "Container yang dijalankan, dihentikan, dilihat log-nya, dan diperbarui panel ini.",
+      "en": "Containers the panel starts, stops, logs and updates."
+    }
+  },
+  "remote": {
+    "title": { "id": "Berjalan di perangkat lain", "en": "Running on other devices" },
+    "connected": { "id": "{{connected}}/{{total}} terhubung", "en": "{{connected}}/{{total}} connected" },
+    "hint": {
+      "id": "Ingress dan DNS diatur di sini; connector-nya ada di perangkat lain.",
+      "en": "Ingress and DNS managed here; the connector lives elsewhere."
+    }
+  },
+  "errors": {
+    "one": {
+      "id": "{{count}} tunnel melaporkan error. Buka tunnel untuk melihat pesannya.",
+      "en": "{{count}} tunnel reports an error. Open the tunnel to see the message."
+    },
+    "many": {
+      "id": "{{count}} tunnel melaporkan error. Buka tunnel untuk melihat pesannya.",
+      "en": "{{count}} tunnels report an error. Open the tunnel to see the message."
+    }
+  },
+  "connector": {
+    "title": { "id": "Runtime connector", "en": "Connector runtime" },
+    "mode": { "id": "Mode {{mode}}", "en": "Mode {{mode}}" },
+    "docker": { "id": "Docker {{version}}", "en": "Docker {{version}}" },
+    "docker_down": { "id": "Docker tidak terjangkau", "en": "Docker not reachable" },
+    "manage": { "id": "Kelola", "en": "Manage" },
+    "image": { "id": "Image", "en": "Image" },
+    "version": { "id": "cloudflared", "en": "cloudflared" },
+    "latest": { "id": "Rilis terbaru", "en": "Latest release" },
+    "update": { "id": "perbarui", "en": "update" },
+    "unknown": { "id": "tidak diketahui", "en": "unknown" }
+  }
+}

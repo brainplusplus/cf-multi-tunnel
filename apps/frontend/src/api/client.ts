@@ -57,8 +57,33 @@ function clearSession() {
   localStorage.removeItem('token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('user');
+  localStorage.removeItem('impersonation');
   if (window.location.pathname !== '/login') {
     window.location.href = '/login';
+  }
+}
+
+/**
+ * An impersonation token expires after an hour and has no refresh pair.
+ *
+ * Refreshing with the parked admin token would silently hand back admin rights
+ * while the UI still says "viewing as …", so instead the admin session is
+ * restored and the page reloads: the banner disappears together with the token.
+ */
+function restoreAdminSession(): boolean {
+  const raw = localStorage.getItem('impersonation');
+  if (!raw) return false;
+  try {
+    const snapshot = JSON.parse(raw) as { access_token: string; refresh_token: string; user: unknown };
+    localStorage.setItem('token', snapshot.access_token);
+    localStorage.setItem('refresh_token', snapshot.refresh_token);
+    localStorage.setItem('user', JSON.stringify(snapshot.user));
+    localStorage.removeItem('impersonation');
+    window.location.reload();
+    return true;
+  } catch {
+    localStorage.removeItem('impersonation');
+    return false;
   }
 }
 
@@ -69,6 +94,11 @@ client.interceptors.response.use(
     const status = error.response?.status;
 
     if (status === 401 && config && !config._retried && !NO_REFRESH.some((p) => config.url?.includes(p))) {
+      // Never refresh out of an impersonated session; see restoreAdminSession.
+      if (localStorage.getItem('impersonation')) {
+        restoreAdminSession();
+        return Promise.reject(error);
+      }
       config._retried = true;
       try {
         const token = await refreshAccessToken();

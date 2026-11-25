@@ -12,6 +12,7 @@ import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
 import AuditPage from './pages/AuditPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
+import DnsPage from './pages/DnsPage';
 
 function Protected() {
   const { user, loading } = useAuth();
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/tunnels" element={<TunnelsPage />} />
         <Route path="/tunnels/:id" element={<TunnelDetailPage />} />
         <Route path="/apps" element={<AppsPage />} />
+        <Route path="/dns" element={<DnsPage />} />
         <Route path="/account" element={<ChangePasswordPage />} />
         <Route
           path="/users"

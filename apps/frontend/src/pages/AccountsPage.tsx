@@ -1,20 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Cloud, KeyRound, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { apiFields, apiMessage } from '../api/client';
 import { accountsApi } from '../api/endpoints';
+import { DataTable, type Column } from '../components/DataTable';
+import { FilterToggle, QueryBuilder, filterCount } from '../components/QueryBuilder';
+import { createGroup, matchesQuery, type FieldDefinition, type QueryGroup } from '../components/query';
 import { Badge, EmptyState, ErrorBox, Field, Modal, PageHeader, Spinner } from '../components/ui';
 import { ApiTokenGuide } from '../components/ApiTokenGuide';
 import { useToast } from '../components/Toast';
+import { useTranslation } from '../i18n/useTranslation';
 import type { AccountChoice, CFAccount } from '../types';
 
+type AccountRow = CFAccount & { credential_label: string };
+
 export default function AccountsPage() {
+  const { t } = useTranslation('accounts');
+  const { t: tc } = useTranslation('common');
   const toast = useToast();
   const [accounts, setAccounts] = useState<CFAccount[] | null>(null);
   const [error, setError] = useState('');
   const [modal, setModal] = useState<'api' | 'import' | null>(null);
   const [attachFor, setAttachFor] = useState<CFAccount | null>(null);
   const [busyId, setBusyId] = useState('');
+  const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<QueryGroup>(() => createGroup());
 
   const load = useCallback(async () => {
     try {
@@ -33,7 +44,7 @@ export default function AccountsPage() {
     setBusyId(account.id);
     try {
       await accountsApi.verify(account.id);
-      toast.push('success', `${account.name} verified`);
+      toast.push('success', t('actions.verified', { name: account.name }));
     } catch (err) {
       toast.push('error', apiMessage(err));
     } finally {
@@ -43,31 +54,144 @@ export default function AccountsPage() {
   };
 
   const remove = async (account: CFAccount) => {
-    if (!window.confirm(`Delete account ${account.name}? Its tunnels and published apps are removed from the panel.`)) return;
+    if (!window.confirm(t('actions.delete_confirm', { name: account.name }))) return;
     try {
       await accountsApi.remove(account.id);
-      toast.push('success', 'Account deleted');
+      toast.push('success', t('actions.deleted'));
       void load();
     } catch (err) {
       toast.push('error', apiMessage(err));
     }
   };
 
+  const fields: FieldDefinition[] = useMemo(
+    () => [
+      { name: 'name', label: t('filter.name'), type: 'string' },
+      {
+        name: 'credential_label',
+        label: t('filter.credential'),
+        type: 'select',
+        options: [
+          { value: t('credential.api'), label: t('credential.api') },
+          { value: t('credential.token_import'), label: t('credential.token_import') },
+        ],
+      },
+      {
+        name: 'status',
+        label: t('filter.status'),
+        type: 'select',
+        options: ['active', 'invalid', 'error'].map((s) => ({ value: s, label: s })),
+      },
+    ],
+    [t],
+  );
+
+  const rows: AccountRow[] = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (accounts ?? [])
+      .map((account) => ({
+        ...account,
+        credential_label: account.credential === 'api' ? t('credential.api') : t('credential.token_import'),
+      }))
+      .filter((account) => {
+        if (term && !`${account.name} ${account.account_id} ${account.account_name}`.toLowerCase().includes(term)) {
+          return false;
+        }
+        return matchesQuery(account as unknown as Record<string, unknown>, filters);
+      });
+  }, [accounts, search, filters, t]);
+
+  const columns: Column<AccountRow>[] = [
+    {
+      key: 'name',
+      label: t('columns.name'),
+      sortable: true,
+      minWidth: 200,
+      render: (account) => (
+        <div>
+          <p className="font-medium text-slate-100">{account.name}</p>
+          <p className="font-mono text-[11px] text-slate-500">{account.account_id}</p>
+          {account.status_message && (
+            <p className="mt-1 max-w-md text-[11px] text-amber-300/80">{account.status_message}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'credential_label',
+      label: t('columns.credential'),
+      sortable: true,
+      width: 170,
+      render: (account) => (
+        <div>
+          <Badge tone={account.credential === 'api' ? 'green' : 'amber'}>{account.credential_label}</Badge>
+          <p className="mt-1 font-mono text-[11px] text-slate-500">{account.token_hint}</p>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      label: t('columns.status'),
+      sortable: true,
+      width: 120,
+      render: (account) => (
+        <Badge tone={account.status === 'active' ? 'green' : 'red'} dot>
+          {account.status}
+        </Badge>
+      ),
+    },
+    {
+      key: 'tunnels',
+      label: t('columns.tunnels'),
+      width: 120,
+      render: (account) => (
+        <Link to={`/tunnels?account=${account.id}`} className="text-xs text-accent-400 hover:underline">
+          {t('actions.view')}
+        </Link>
+      ),
+    },
+    {
+      key: 'actions',
+      label: t('columns.actions'),
+      width: 280,
+      render: (account) => (
+        <div className="flex justify-end gap-1.5">
+          {account.credential === 'token_import' && (
+            <button className="btn-primary !px-2 !py-1 !text-xs" onClick={() => setAttachFor(account)}>
+              <KeyRound className="h-3.5 w-3.5" /> {t('credential.attach')}
+            </button>
+          )}
+          <button
+            className="btn-ghost !px-2 !py-1 !text-xs"
+            disabled={busyId === account.id}
+            onClick={() => void verify(account)}
+          >
+            {busyId === account.id ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {t('actions.verify')}
+          </button>
+          <button className="btn-danger !px-2 !py-1 !text-xs" onClick={() => void remove(account)}>
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
       <PageHeader
-        title="Cloudflare accounts"
-        description="Each account is a credential set. Users only see their own; admins see everything."
+        title={t('title')}
+        description={t('description')}
         actions={
           <>
             <button className="btn-ghost" onClick={() => void load()}>
-              <RefreshCw className="h-4 w-4" /> Refresh
+              <RefreshCw className="h-4 w-4" /> {t('refresh')}
             </button>
             <button className="btn-ghost" onClick={() => setModal('import')}>
-              <KeyRound className="h-4 w-4" /> Import tunnel token
+              <KeyRound className="h-4 w-4" /> {t('import_tunnel')}
             </button>
             <button className="btn-primary" onClick={() => setModal('api')}>
-              <Plus className="h-4 w-4" /> Add API token
+              <Plus className="h-4 w-4" /> {t('new_account')}
             </button>
           </>
         }
@@ -83,78 +207,46 @@ export default function AccountsPage() {
         <div className="card">
           <EmptyState
             icon={<Cloud className="h-8 w-8" />}
-            title="No Cloudflare account yet"
-            description="Add a scoped API token so the panel can create tunnels, push ingress and write DNS for you."
+            title={t('empty')}
+            description={t('empty_hint')}
             action={
               <button className="btn-primary" onClick={() => setModal('api')}>
-                <Plus className="h-4 w-4" /> Add your first account
+                <Plus className="h-4 w-4" /> {t('empty_action')}
               </button>
             }
           />
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full">
-            <thead className="border-b border-surface-700/70 bg-surface-900/60">
-              <tr>
-                <th className="th">Account</th>
-                <th className="th">Credential</th>
-                <th className="th">Status</th>
-                <th className="th">Tunnels</th>
-                <th className="th text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-800">
-              {accounts.map((account) => (
-                <tr key={account.id} className="hover:bg-surface-900/40">
-                  <td className="td">
-                    <p className="font-medium text-slate-100">{account.name}</p>
-                    <p className="font-mono text-[11px] text-slate-500">{account.account_id}</p>
-                    {account.status_message && (
-                      <p className="mt-1 max-w-md text-[11px] text-amber-300/80">{account.status_message}</p>
-                    )}
-                  </td>
-                  <td className="td">
-                    {account.credential === 'api' ? (
-                      <Badge tone="green">API token</Badge>
-                    ) : (
-                      <Badge tone="amber">tunnel token</Badge>
-                    )}
-                    <p className="mt-1 font-mono text-[11px] text-slate-500">{account.token_hint}</p>
-                  </td>
-                  <td className="td">
-                    <Badge tone={account.status === 'active' ? 'green' : 'red'} dot>
-                      {account.status}
-                    </Badge>
-                  </td>
-                  <td className="td">
-                    <Link to={`/tunnels?account=${account.id}`} className="text-accent-400 hover:underline">
-                      View
-                    </Link>
-                  </td>
-                  <td className="td">
-                    <div className="flex justify-end gap-1.5">
-                      {account.credential === 'token_import' && (
-                        <button
-                          className="btn-primary !px-2 !py-1 !text-xs"
-                          onClick={() => setAttachFor(account)}
-                        >
-                          <KeyRound className="h-3.5 w-3.5" /> Attach API token
-                        </button>
-                      )}
-                      <button className="btn-ghost !px-2 !py-1 !text-xs" disabled={busyId === account.id} onClick={() => void verify(account)}>
-                        {busyId === account.id ? <Spinner className="h-3.5 w-3.5" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                        Verify
-                      </button>
-                      <button className="btn-danger !px-2 !py-1 !text-xs" onClick={() => void remove(account)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="card">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <input
+              className="field !w-64 !py-1.5 text-xs"
+              placeholder={t('search')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <FilterToggle
+              open={showFilters}
+              count={filterCount(filters)}
+              onClick={() => setShowFilters((v) => !v)}
+            />
+            <span className="text-[11px] text-slate-500">{tc('rows_found', { count: rows.length })}</span>
+          </div>
+
+          {showFilters && (
+            <div className="mb-3">
+              <QueryBuilder fields={fields} value={filters} onChange={setFilters} />
+            </div>
+          )}
+
+          <DataTable
+            tableId="accounts"
+            data={rows}
+            columns={columns}
+            keyField="id"
+            emptyMessage={tc('no_match')}
+            initialSort={{ field: 'name', direction: 'asc' }}
+          />
         </div>
       )}
 
@@ -197,6 +289,8 @@ function AttachTokenModal({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { t } = useTranslation('accounts');
+  const { t: tc } = useTranslation('common');
   const toast = useToast();
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
@@ -217,7 +311,7 @@ function AttachTokenModal({
     setFields({});
     try {
       await accountsApi.attachToken(account.id, token);
-      toast.push('success', 'Token attached. Existing tunnels and hostnames were imported.');
+      toast.push('success', t('attach.success'));
       onDone();
     } catch (err) {
       setError(apiMessage(err));
@@ -231,57 +325,56 @@ function AttachTokenModal({
     <Modal
       open={!!account}
       onClose={onClose}
-      title="Attach an API token"
-      description={`Upgrade ${account?.name ?? 'this account'} in place. Its imported tunnels are kept; ingress and DNS become manageable from here.`}
+      title={t('attach.title')}
+      description={t('attach.description', { name: account?.name ?? '—' })}
       wide
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
-            Cancel
+            {tc('cancel')}
           </button>
           <button className="btn-primary" disabled={busy || !token} onClick={() => void submit()}>
-            {busy && <Spinner className="h-4 w-4" />} Attach token
+            {busy && <Spinner className="h-4 w-4" />} {t('attach.submit')}
           </button>
         </>
       }
     >
       {error && <ErrorBox message={error} />}
-      <Field label="API token" hint="Must be able to read this Cloudflare account and its tunnels." error={fields.api_token}>
+      <Field label={t('fields.api_token')} hint={t('fields.api_token_hint')} error={fields.api_token}>
         <input
           className="field font-mono text-xs"
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder="Paste the token"
+          placeholder={t('fields.token_placeholder')}
           autoComplete="off"
         />
       </Field>
       <div className="rounded-lg border border-surface-700 bg-surface-950/50 p-3 text-xs text-slate-400">
-        <p className="font-medium text-slate-300">Required permissions — two policies</p>
+        <p className="font-medium text-slate-300">{t('permissions.title')}</p>
         <ul className="mt-1 list-inside list-disc space-y-0.5">
           <li>
-            <span className="text-slate-300">Account policy</span> → Cloudflare Tunnel · Edit
+            <span className="text-slate-300">{t('permissions.account_policy')}</span> → {t('permissions.tunnel_edit')}
           </li>
           <li>
-            <span className="text-slate-300">Account policy</span> → Account Settings · Read
+            <span className="text-slate-300">{t('permissions.account_policy')}</span> → {t('permissions.settings_read')}
           </li>
           <li>
-            <span className="text-slate-300">Zone policy</span> → Zone · Read
+            <span className="text-slate-300">{t('permissions.zone_policy')}</span> → {t('permissions.zone_read')}
           </li>
           <li>
-            <span className="text-slate-300">Zone policy</span> → DNS · Edit
+            <span className="text-slate-300">{t('permissions.zone_policy')}</span> → {t('permissions.dns_edit')}
           </li>
         </ul>
       </div>
-      <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">
-        After attaching, the panel lists every tunnel the token can see and imports the hostnames already present in each
-        tunnel&apos;s ingress. Nothing is deleted.
-      </div>
+      <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">{t('attach.after')}</div>
       <ApiTokenGuide />
     </Modal>
   );
 }
 
 function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const { t } = useTranslation('accounts');
+  const { t: tc } = useTranslation('common');
   const toast = useToast();
   const [name, setName] = useState('');
   const [token, setToken] = useState('');
@@ -339,10 +432,7 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
         api_token: token,
         account_id: accountId || undefined,
       });
-      toast.push(
-        'success',
-        `Account ${account.name} saved. Existing tunnels and their hostnames were imported.`,
-      );
+      toast.push('success', t('add.success', { name: account.name }));
       setName('');
       setToken('');
       setAccountId('');
@@ -360,56 +450,52 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
     <Modal
       open={open}
       onClose={onClose}
-      title="Add Cloudflare account"
-      description="Use a scoped API token. The panel verifies it before saving and stores it encrypted."
+      title={t('add.title')}
+      description={t('add.description')}
       wide
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
-            Cancel
+            {tc('cancel')}
           </button>
           <button
             className="btn-primary"
             disabled={busy || !token || (multiple && !accountId)}
             onClick={() => void submit()}
           >
-            {busy && <Spinner className="h-4 w-4" />} Add account
+            {busy && <Spinner className="h-4 w-4" />} {t('add.submit')}
           </button>
         </>
       }
     >
       {error && <ErrorBox message={error} />}
-      <Field label="Display name" hint="Optional. Defaults to the Cloudflare account name.">
+      <Field label={t('fields.display_name')} hint={t('fields.display_name_hint')}>
         <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Production" />
       </Field>
-      <Field label="API token" error={fields.api_token}>
+      <Field label={t('fields.api_token')} error={fields.api_token}>
         <input
           className="field font-mono text-xs"
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder="Paste the token"
+          placeholder={t('fields.token_placeholder')}
           autoComplete="off"
         />
       </Field>
 
       {multiple ? (
-        <Field
-          label="Cloudflare account"
-          hint="This token can see more than one account. Pick the one to manage."
-          error={fields.account_id}
-        >
+        <Field label={t('fields.account')} hint={t('fields.account_multiple_hint')} error={fields.account_id}>
           <select className="field" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-            <option value="">Select an account</option>
+            <option value="">{t('fields.account_select')}</option>
             {choices?.map((c) => (
               <option key={c.id} value={c.id} disabled={c.already_added}>
                 {c.name}
-                {c.already_added ? ' — already added' : ` · ${c.id}`}
+                {c.already_added ? ` — ${t('fields.account_already_added')}` : ` · ${c.id}`}
               </option>
             ))}
           </select>
         </Field>
       ) : choices?.length === 1 ? (
-        <Field label="Cloudflare account" hint="Detected from the token.">
+        <Field label={t('fields.account')} hint={t('fields.account_detected')}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-surface-700 bg-surface-950/50 px-3 py-2 text-xs">
             <span className="font-medium text-slate-200">{choices[0].name}</span>
             <code className="font-mono text-[11px] text-slate-500">{choices[0].id}</code>
@@ -417,12 +503,8 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
         </Field>
       ) : (
         <Field
-          label="Account ID"
-          hint={
-            probing
-              ? 'Checking the token…'
-              : probeError || 'Paste the token above; the account list appears here once it verifies.'
-          }
+          label={t('fields.account_id')}
+          hint={probing ? t('fields.account_id_checking') : probeError || t('fields.account_id_hint')}
           error={fields.account_id}
         >
           <div className="flex items-center gap-2">
@@ -430,7 +512,7 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
               className="field font-mono text-xs"
               value={accountId}
               onChange={(e) => setAccountId(e.target.value)}
-              placeholder="Filled automatically when the token verifies"
+              placeholder={t('fields.account_id_placeholder')}
             />
             {probing && <Spinner className="h-4 w-4 shrink-0 text-slate-500" />}
           </div>
@@ -438,19 +520,19 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
       )}
 
       <div className="rounded-lg border border-surface-700 bg-surface-950/50 p-3 text-xs text-slate-400">
-        <p className="font-medium text-slate-300">Required permissions — two policies</p>
+        <p className="font-medium text-slate-300">{t('permissions.title')}</p>
         <ul className="mt-1 list-inside list-disc space-y-0.5">
           <li>
-            <span className="text-slate-300">Account policy</span> → Cloudflare Tunnel · Edit
+            <span className="text-slate-300">{t('permissions.account_policy')}</span> → {t('permissions.tunnel_edit')}
           </li>
           <li>
-            <span className="text-slate-300">Account policy</span> → Account Settings · Read
+            <span className="text-slate-300">{t('permissions.account_policy')}</span> → {t('permissions.settings_read')}
           </li>
           <li>
-            <span className="text-slate-300">Zone policy</span> → Zone · Read
+            <span className="text-slate-300">{t('permissions.zone_policy')}</span> → {t('permissions.zone_read')}
           </li>
           <li>
-            <span className="text-slate-300">Zone policy</span> → DNS · Edit
+            <span className="text-slate-300">{t('permissions.zone_policy')}</span> → {t('permissions.dns_edit')}
           </li>
         </ul>
       </div>
@@ -460,6 +542,8 @@ function AddAccountModal({ open, onClose, onDone }: { open: boolean; onClose: ()
 }
 
 function ImportTunnelModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const { t } = useTranslation('accounts');
+  const { t: tc } = useTranslation('common');
   const toast = useToast();
   const [name, setName] = useState('');
   const [token, setToken] = useState('');
@@ -477,7 +561,7 @@ function ImportTunnelModal({ open, onClose, onDone }: { open: boolean; onClose: 
         location: 'remote',
         host_label: hostLabel || undefined,
       });
-      toast.push('success', `Imported tunnel ${result.tunnel.name}`);
+      toast.push('success', t('import.success', { name: result.tunnel.name }));
       setName('');
       setToken('');
       setHostLabel('');
@@ -493,27 +577,27 @@ function ImportTunnelModal({ open, onClose, onDone }: { open: boolean; onClose: 
     <Modal
       open={open}
       onClose={onClose}
-      title="Import an existing tunnel"
-      description="Paste the token printed by `cloudflared tunnel token <name>`. No API token required."
+      title={t('import.title')}
+      description={t('import.description')}
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
-            Cancel
+            {tc('cancel')}
           </button>
           <button className="btn-primary" disabled={busy || !token} onClick={() => void submit()}>
-            {busy && <Spinner className="h-4 w-4" />} Import
+            {busy && <Spinner className="h-4 w-4" />} {t('import.submit')}
           </button>
         </>
       }
     >
       {error && <ErrorBox message={error} />}
-      <Field label="Tunnel name" hint="Optional label inside the panel.">
+      <Field label={t('fields.tunnel_name')} hint={t('fields.tunnel_name_hint')}>
         <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="laptop-tunnel" />
       </Field>
-      <Field label="Tunnel token" hint="The long eyJ... string, not the API token.">
+      <Field label={t('fields.tunnel_token')} hint={t('fields.tunnel_token_hint')}>
         <textarea className="field h-24 font-mono text-xs" value={token} onChange={(e) => setToken(e.target.value)} />
       </Field>
-      <Field label="Device label" hint="Where this connector runs, so you can tell it apart later.">
+      <Field label={t('fields.device_label')} hint={t('fields.device_label_hint')}>
         <input
           className="field"
           value={hostLabel}
@@ -522,29 +606,12 @@ function ImportTunnelModal({ open, onClose, onDone }: { open: boolean; onClose: 
         />
       </Field>
       <div className="rounded-lg border border-surface-700 bg-surface-950/50 p-3 text-xs text-slate-400">
-        <p className="font-medium text-slate-300">Where to get this token</p>
-        <p className="mt-1">
-          Cloudflare Zero Trust → <span className="text-slate-300">Networks → Tunnels</span> → open the tunnel (or
-          create one) → the install command for the <span className="text-slate-300">cloudflared</span> connector
-          contains it:{' '}
-          <code className="rounded bg-surface-800 px-1 py-0.5 font-mono text-[11px] text-slate-300">
-            --token eyJ...
-          </code>
-          . Copy only the part after <span className="text-slate-300">--token</span>.
-        </p>
-        <p className="mt-1.5">
-          On an existing host you can also run{' '}
-          <code className="rounded bg-surface-800 px-1 py-0.5 font-mono text-[11px] text-slate-300">
-            cloudflared tunnel token &lt;name&gt;
-          </code>
-          , or read it from that device&apos;s <code className="font-mono text-[11px] text-slate-400">config.yml</code>{' '}
-          / <code className="font-mono text-[11px] text-slate-400">credentials.json</code>.
-        </p>
+        <p className="font-medium text-slate-300">{t('import.where_title')}</p>
+        <p className="mt-1.5">{t('import.where_body')}</p>
+        <p className="mt-1.5">{t('import.where_body_existing')}</p>
       </div>
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-        Imported tunnels are treated as <span className="font-medium">remote</span>: you run cloudflared on that device. A
-        tunnel-token account cannot push ingress or DNS through the API, so the panel generates config.yml and shows the
-        CNAME you must create. Attach an API token later to unlock full automation.
+        {t('import.remote_warning')}
       </div>
     </Modal>
   );

@@ -19,9 +19,11 @@ import { apiFields, apiMessage } from '../api/client';
 import { accountsApi, appsApi, tunnelsApi, type AppPayload } from '../api/endpoints';
 import { Badge, CopyButton, EmptyState, ErrorBox, Field, Modal, PageHeader, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
+import { useTranslation } from '../i18n/useTranslation';
 import type { CFAccount, CFZone, PublishedApp, Tunnel } from '../types';
 
 export default function TunnelDetailPage() {
+  const { t } = useTranslation('tunnel_detail');
   const { id = '' } = useParams();
   const toast = useToast();
   const navigate = useNavigate();
@@ -119,9 +121,7 @@ export default function TunnelDetailPage() {
       const { apps_created: created, apps_updated: updated } = res.result;
       toast.push(
         created + updated === 0 ? 'info' : 'success',
-        created + updated === 0
-          ? 'Cloudflare has no new hostnames for this account.'
-          : `Imported ${created} new hostname(s), refreshed ${updated}.`,
+        created + updated === 0 ? t('sync_none') : t('sync_done', { created, updated }),
       );
     } catch (err) {
       toast.push('error', apiMessage(err));
@@ -132,10 +132,10 @@ export default function TunnelDetailPage() {
 
   const remove = async () => {
     if (!tunnel) return;
-    if (!window.confirm(`Delete tunnel ${tunnel.name}? It is also removed from Cloudflare.`)) return;
+    if (!window.confirm(t('delete_confirm', { name: tunnel.name }))) return;
     try {
       await tunnelsApi.remove(tunnel.id);
-      toast.push('success', 'Tunnel deleted');
+      toast.push('success', t('deleted'));
       navigate('/tunnels');
     } catch (err) {
       toast.push('error', apiMessage(err));
@@ -143,10 +143,10 @@ export default function TunnelDetailPage() {
   };
 
   const removeApp = async (app: PublishedApp) => {
-    if (!window.confirm(`Delete ${app.hostname}?`)) return;
+    if (!window.confirm(t('app_delete_confirm', { hostname: app.hostname }))) return;
     try {
       await appsApi.remove(app.id);
-      toast.push('success', 'Published app removed');
+      toast.push('success', t('app_deleted'));
       void load();
     } catch (err) {
       toast.push('error', apiMessage(err));
@@ -168,7 +168,7 @@ export default function TunnelDetailPage() {
   return (
     <div>
       <Link to="/tunnels" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200">
-        <ArrowLeft className="h-4 w-4" /> Tunnels
+        <ArrowLeft className="h-4 w-4" /> {t('back')}
       </Link>
 
       <PageHeader
@@ -177,17 +177,17 @@ export default function TunnelDetailPage() {
         actions={
           <>
             <button className="btn-ghost" disabled={busy === 'sync'} onClick={() => void syncFromCloudflare()}>
-              {busy === 'sync' ? <Spinner className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />} Sync
+              {busy === 'sync' ? <Spinner className="h-4 w-4" /> : <RefreshCw className="h-4 w-4" />} {t('sync')}
             </button>
             <button className="btn-ghost" onClick={() => void openConfig()}>
               <FileCode2 className="h-4 w-4" /> config.yml
             </button>
             <button className="btn-ghost" onClick={() => void openToken()}>
-              <KeyRound className="h-4 w-4" /> Token
+              <KeyRound className="h-4 w-4" /> {t('token')}
             </button>
             {managed && (
               <button className="btn-ghost" onClick={() => void openLogs()}>
-                <Terminal className="h-4 w-4" /> Logs
+                <Terminal className="h-4 w-4" /> {t('logs')}
               </button>
             )}
             {managed && (
@@ -199,11 +199,11 @@ export default function TunnelDetailPage() {
                 ) : (
                   <Play className="h-4 w-4" />
                 )}
-                {tunnel.status === 'running' ? 'Stop' : 'Start'}
+                {tunnel.status === 'running' ? t('stop') : t('start')}
               </button>
             )}
             <button className="btn-primary" onClick={() => { setEditingApp(null); setShowAppModal(true); }}>
-              <Plus className="h-4 w-4" /> Publish app
+              <Plus className="h-4 w-4" /> {t('publish_app')}
             </button>
             <button className="btn-danger" onClick={() => void remove()}>
               <Trash2 className="h-4 w-4" />
@@ -213,41 +213,45 @@ export default function TunnelDetailPage() {
       />
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <InfoTile label="Placement">
+        <InfoTile label={t('tiles.placement')}>
           <div className="flex items-center gap-2">
             <Badge tone={isLocal ? 'blue' : 'violet'} dot>
-              {isLocal ? 'this server' : 'remote device'}
+              {isLocal ? t('placement.this_server') : t('placement.remote_device')}
             </Badge>
-            <button onClick={() => setShowPlacement(true)} className="text-slate-500 hover:text-slate-300" title="Change placement">
+            <button
+              onClick={() => setShowPlacement(true)}
+              className="text-slate-500 hover:text-slate-300"
+              title={t('placement.change')}
+            >
               <Pencil className="h-3 w-3" />
             </button>
           </div>
           <p className="mt-1 truncate text-[11px] text-slate-500">{tunnel.host_label || '—'}</p>
         </InfoTile>
-        <InfoTile label="Status">
+        <InfoTile label={t('tiles.status')}>
           <Badge tone={tunnel.status === 'running' ? 'green' : tunnel.status === 'error' ? 'red' : 'slate'} dot>
             {tunnel.status}
           </Badge>
           {tunnel.last_seen_at && (
-            <p className="mt-1 text-[11px] text-slate-500">seen {new Date(tunnel.last_seen_at).toLocaleString()}</p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              {t('seen', { when: new Date(tunnel.last_seen_at).toLocaleString() })}
+            </p>
           )}
         </InfoTile>
-        <InfoTile label="Config source">
+        <InfoTile label={t('tiles.config_source')}>
           <Badge tone={tunnel.config_src === 'cloudflare' ? 'green' : 'amber'}>{tunnel.config_src}</Badge>
         </InfoTile>
-        <InfoTile label="cloudflared">
-          <span className="font-mono text-sm text-slate-200">{managed ? tunnel.image_version || '—' : 'n/a here'}</span>
+        <InfoTile label={t('tiles.cloudflared')}>
+          <span className="font-mono text-sm text-slate-200">
+            {managed ? tunnel.image_version || '—' : t('na_here')}
+          </span>
         </InfoTile>
       </div>
 
       {!isLocal && (
         <div className="mb-4 flex items-start gap-2 rounded-lg border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-xs text-violet-200">
           <Laptop className="mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            This tunnel runs on <span className="font-medium">{tunnel.host_label || 'another device'}</span>. The panel manages its
-            ingress and DNS through the Cloudflare API but cannot start, stop or read logs of that connector — use the Token
-            button to run cloudflared there.
-          </div>
+          <div>{t('remote_notice', { host: tunnel.host_label || t('placement.remote_device') })}</div>
         </div>
       )}
 
@@ -259,17 +263,17 @@ export default function TunnelDetailPage() {
 
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between border-b border-surface-700/70 px-4 py-3">
-          <h2 className="text-sm font-semibold text-white">Published apps</h2>
-          <span className="text-xs text-slate-500">{apps.length} hostname(s)</span>
+          <h2 className="text-sm font-semibold text-white">{t('apps.title')}</h2>
+          <span className="text-xs text-slate-500">{t('apps.count', { count: apps.length })}</span>
         </div>
         {apps.length === 0 ? (
           <EmptyState
             icon={<Globe2 className="h-7 w-7" />}
-            title="Nothing published yet"
-            description="Add a hostname and the panel writes the ingress rule and the DNS CNAME for you."
+            title={t('apps.empty_title')}
+            description={t('apps.empty_desc')}
             action={
               <button className="btn-primary" onClick={() => { setEditingApp(null); setShowAppModal(true); }}>
-                <Plus className="h-4 w-4" /> Publish app
+                <Plus className="h-4 w-4" /> {t('publish_app')}
               </button>
             }
           />
@@ -277,11 +281,11 @@ export default function TunnelDetailPage() {
           <table className="w-full">
             <thead className="border-b border-surface-700/70 bg-surface-900/60">
               <tr>
-                <th className="th">Hostname</th>
-                <th className="th">Service</th>
-                <th className="th">DNS</th>
-                <th className="th">Sync</th>
-                <th className="th text-right">Actions</th>
+                <th className="th">{t('columns.hostname')}</th>
+                <th className="th">{t('columns.service')}</th>
+                <th className="th">{t('columns.dns')}</th>
+                <th className="th">{t('columns.sync')}</th>
+                <th className="th text-right">{t('columns.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-800">
@@ -306,9 +310,11 @@ export default function TunnelDetailPage() {
                   <td className="td font-mono text-xs">{app.service_url}</td>
                   <td className="td">
                     {app.manage_dns ? (
-                      <Badge tone={app.dns_record_id ? 'green' : 'amber'}>{app.dns_record_id ? 'managed' : 'pending'}</Badge>
+                      <Badge tone={app.dns_record_id ? 'green' : 'amber'}>
+                        {app.dns_record_id ? t('dns.managed') : t('dns.pending')}
+                      </Badge>
                     ) : (
-                      <Badge tone="slate">manual</Badge>
+                      <Badge tone="slate">{t('dns.manual')}</Badge>
                     )}
                   </td>
                   <td className="td">
@@ -331,13 +337,13 @@ export default function TunnelDetailPage() {
                     <div className="flex justify-end gap-1.5">
                       {app.kind === 'panel' ? (
                         <Link to="/settings" className="text-[11px] text-slate-500 hover:text-accent-400">
-                          managed in Settings
+                          {t('apps.managed_in_settings')}
                         </Link>
                       ) : (
                         <>
                           <button
                             className="btn-ghost !px-2 !py-1 !text-xs"
-                            title="Edit hostname or origin"
+                            title={t('edit_hint')}
                             onClick={() => {
                               setEditingApp(app);
                               setShowAppModal(true);
@@ -347,7 +353,7 @@ export default function TunnelDetailPage() {
                           </button>
                           <button
                             className="btn-ghost !px-2 !py-1 !text-xs"
-                            title="Delete this hostname"
+                            title={t('delete_hint')}
                             onClick={() => void removeApp(app)}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -363,7 +369,7 @@ export default function TunnelDetailPage() {
         )}
       </div>
 
-      <Modal open={showLogs} onClose={() => setShowLogs(false)} title="Connector logs" wide>
+      <Modal open={showLogs} onClose={() => setShowLogs(false)} title={t('modals.logs_title')} wide>
         {busy === 'logs' ? (
           <div className="flex justify-center py-10 text-slate-400">
             <Spinner className="h-6 w-6" />
@@ -374,7 +380,7 @@ export default function TunnelDetailPage() {
               <CopyButton value={logs} />
             </div>
             <pre className="max-h-[50vh] overflow-auto rounded-lg bg-black/60 p-3 font-mono text-[11px] leading-relaxed text-slate-300">
-              {logs || 'No output'}
+              {logs || t('modals.no_output')}
             </pre>
           </div>
         )}
@@ -383,8 +389,8 @@ export default function TunnelDetailPage() {
       <Modal
         open={showConfig}
         onClose={() => setShowConfig(false)}
-        title="cloudflared config.yml"
-        description="What to place on the connector host when it runs outside this panel."
+        title={t('modals.config_title')}
+        description={t('modals.config_desc')}
         wide
       >
         <div className="relative">
@@ -400,8 +406,8 @@ export default function TunnelDetailPage() {
       <Modal
         open={showToken}
         onClose={() => setShowToken(false)}
-        title="Tunnel token"
-        description="Run this on the connector host: cloudflared tunnel --no-autoupdate run --token <token>"
+        title={t('modals.token_title')}
+        description={t('modals.token_desc')}
         wide
       >
         <div className="relative">
@@ -409,12 +415,10 @@ export default function TunnelDetailPage() {
             <CopyButton value={token} />
           </div>
           <pre className="max-h-40 overflow-auto rounded-lg bg-black/60 p-3 font-mono text-[11px] leading-relaxed text-slate-300">
-            {token || 'loading...'}
+            {token || t('modals.loading')}
           </pre>
         </div>
-        <p className="text-xs text-slate-500">
-          Anyone holding this token can connect a connector to the tunnel. It is shown only to the tunnel owner and admins.
-        </p>
+        <p className="text-xs text-slate-500">{t('modals.token_warning')}</p>
       </Modal>
 
       <PlacementModal
@@ -466,6 +470,8 @@ function PlacementModal({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { t } = useTranslation('tunnel_detail');
+  const { t: tc } = useTranslation('common');
   const toast = useToast();
   const [location, setLocation] = useState<'local' | 'remote'>(tunnel.location);
   const [hostLabel, setHostLabel] = useState(tunnel.host_label);
@@ -488,7 +494,7 @@ function PlacementModal({
         host_label: hostLabel,
         connector_mode: location === 'local' ? 'docker' : 'external',
       });
-      toast.push('success', 'Placement updated');
+      toast.push('success', t('placement_modal.saved'));
       onDone();
     } catch (err) {
       setError(apiMessage(err));
@@ -501,15 +507,15 @@ function PlacementModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Tunnel placement"
-      description="Tells the panel whether it may control the connector on this host."
+      title={t('placement_modal.title')}
+      description={t('placement_modal.description')}
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
-            Cancel
+            {tc('cancel')}
           </button>
           <button className="btn-primary" disabled={busy} onClick={() => void submit()}>
-            {busy && <Spinner className="h-4 w-4" />} Save
+            {busy && <Spinner className="h-4 w-4" />} {tc('save')}
           </button>
         </>
       }
@@ -524,9 +530,9 @@ function PlacementModal({
           }`}
         >
           <div className="flex items-center gap-2 text-sm font-medium text-slate-100">
-            <HardDrive className="h-4 w-4" /> This server
+            <HardDrive className="h-4 w-4" /> {t('placement.this_server')}
           </div>
-          <p className="mt-1 text-[11px] text-slate-400">Panel runs the container and can start/stop it.</p>
+          <p className="mt-1 text-[11px] text-slate-400">{t('placement_modal.this_server_hint')}</p>
         </button>
         <button
           type="button"
@@ -536,20 +542,19 @@ function PlacementModal({
           }`}
         >
           <div className="flex items-center gap-2 text-sm font-medium text-slate-100">
-            <Laptop className="h-4 w-4" /> Another device
+            <Laptop className="h-4 w-4" /> {t('placement.remote_device')}
           </div>
-          <p className="mt-1 text-[11px] text-slate-400">Panel only manages ingress and DNS through the API.</p>
+          <p className="mt-1 text-[11px] text-slate-400">{t('placement_modal.another_device_hint')}</p>
         </button>
       </div>
 
-      <Field label="Device label" hint="Shown in the tunnel list so you can tell devices apart.">
+      <Field label={t('placement_modal.device_label')} hint={t('placement_modal.device_label_hint')}>
         <input className="field" value={hostLabel} onChange={(e) => setHostLabel(e.target.value)} />
       </Field>
 
       {location === 'remote' && tunnel.desired_running && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-          Saving stops and removes the container currently running on this host. Make sure cloudflared is running on the new
-          device before the old connector disappears, or the tunnel will be offline.
+          {t('placement_modal.remote_warning')}
         </div>
       )}
     </Modal>
@@ -572,6 +577,8 @@ function PublishAppModal({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const { t } = useTranslation('tunnel_detail');
+  const { t: tc } = useTranslation('common');
   const toast = useToast();
   const [subdomain, setSubdomain] = useState('');
   const [domain, setDomain] = useState(zones[0]?.name ?? '');
@@ -635,7 +642,9 @@ function PublishAppModal({
       const saved = app ? await appsApi.update(app.id, payload) : await tunnelsApi.createApp(tunnel.id, payload);
       toast.push(
         saved.sync_status === 'synced' ? 'success' : 'info',
-        saved.sync_status === 'synced' ? `${saved.hostname} is live` : `${saved.hostname} saved: ${saved.last_error}`,
+        saved.sync_status === 'synced'
+          ? t('app_modal.saved_live', { hostname: saved.hostname })
+          : t('app_modal.saved_pending', { hostname: saved.hostname, error: saved.last_error ?? '' }),
       );
       onDone();
     } catch (err) {
@@ -650,29 +659,25 @@ function PublishAppModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={app ? 'Edit app' : 'Publish an app'}
-      description={
-        app
-          ? 'Change the hostname or the origin. Saving rewrites the ingress rule and the DNS record.'
-          : 'Pick a hostname and the origin the tunnel should reach.'
-      }
+      title={app ? t('app_modal.edit_title') : t('app_modal.create_title')}
+      description={app ? t('app_modal.edit_desc') : t('app_modal.create_desc')}
       footer={
         <>
           <button className="btn-ghost" onClick={onClose}>
-            Cancel
+            {tc('cancel')}
           </button>
           <button className="btn-primary" disabled={busy || !subdomain || !domain} onClick={() => void submit()}>
-            {busy && <Spinner className="h-4 w-4" />} {app ? 'Save changes' : 'Publish'}
+            {busy && <Spinner className="h-4 w-4" />} {app ? t('app_modal.save') : t('app_modal.submit')}
           </button>
         </>
       }
     >
       {error && <ErrorBox message={error} />}
       <div className="grid grid-cols-[1fr_1.4fr] gap-3">
-        <Field label="Subdomain" error={fields.hostname}>
+        <Field label={t('app_modal.subdomain')} error={fields.hostname}>
           <input className="field" value={subdomain} onChange={(e) => setSubdomain(e.target.value)} placeholder="app" />
         </Field>
-        <Field label="Domain" hint={zones.length === 0 ? 'No zone cached; sync the account first.' : undefined}>
+        <Field label={t('app_modal.domain')} hint={zones.length === 0 ? t('app_modal.no_zone') : undefined}>
           {zones.length > 0 ? (
             <select className="field" value={domain} onChange={(e) => setDomain(e.target.value)}>
               {zones.map((z) => (
@@ -687,42 +692,30 @@ function PublishAppModal({
         </Field>
       </div>
       <Field
-        label="Service URL"
-        hint={
-          tunnel.location === 'local'
-            ? 'Reached from the connector container, not from this browser. localhost would be the connector itself.'
-            : 'Reachable from the device running the connector, not from this panel.'
-        }
+        label={t('app_modal.service_url')}
+        hint={tunnel.location === 'local' ? t('app_modal.service_local_hint') : t('app_modal.service_remote_hint')}
         error={fields.service_url}
       >
         <input className="field font-mono text-xs" value={serviceUrl} onChange={(e) => setServiceUrl(e.target.value)} />
       </Field>
       {tunnel.location === 'local' && (
         <div className="rounded-lg border border-surface-700 bg-surface-950/50 p-3 text-xs text-slate-400">
-          <p className="font-medium text-slate-300">What to put here</p>
+          <p className="font-medium text-slate-300">{t('app_modal.what_title')}</p>
           <ul className="mt-1 space-y-0.5">
             <li>
-              <code className="font-mono text-slate-300">http://host.docker.internal:8080</code> — a process on this
-              server, or a container whose port is published on the host
+              <code className="font-mono text-slate-300">http://host.docker.internal:8080</code> {t('app_modal.what_1')}
             </li>
             <li>
-              <code className="font-mono text-slate-300">http://my-container:3000</code> — a container attached to the{' '}
-              <code className="font-mono text-slate-300">cfmt-panel</code> network, by container name and internal port
+              <code className="font-mono text-slate-300">http://my-container:3000</code> {t('app_modal.what_2')}
             </li>
             <li>
-              <code className="font-mono text-slate-300">http://192.168.0.103</code> — another device on the LAN; the
-              connector container can reach it directly, no extra network needed
+              <code className="font-mono text-slate-300">http://192.168.0.103</code> {t('app_modal.what_3')}
             </li>
             <li>
-              <code className="font-mono text-slate-300">https://localhost:8006</code> — only when that host is
-              genuinely reachable from inside the connector container
+              <code className="font-mono text-slate-300">https://localhost:8006</code> {t('app_modal.what_4')}
             </li>
           </ul>
-          <p className="mt-1.5 text-slate-500">
-            A container on a different Docker network is not reachable by name; connect it to{' '}
-            <code className="font-mono">cfmt-panel</code> or use its published host port via{' '}
-            <code className="font-mono">host.docker.internal</code>.
-          </p>
+          <p className="mt-1.5 text-slate-500">{t('app_modal.what_note')}</p>
         </div>
       )}
       {serviceUrl.trim().toLowerCase().startsWith('https://') && (
@@ -734,15 +727,12 @@ function PublishAppModal({
             onChange={(e) => setSkipTLSVerify(e.target.checked)}
           />
           <span>
-            Skip TLS verification
-            <span className="block text-xs text-slate-500">
-              Needed when the origin uses a self-signed certificate or one issued for a different name — common for a
-              LAN device reached by IP.
-            </span>
+            {t('app_modal.skip_tls')}
+            <span className="block text-xs text-slate-500">{t('app_modal.skip_tls_hint')}</span>
           </span>
         </label>
       )}
-      <Field label="Path" hint="Match only a sub-path, e.g. /api/*">
+      <Field label={t('app_modal.path')} hint={t('app_modal.path_hint')}>
         <input className="field font-mono text-xs" value={path} onChange={(e) => setPath(e.target.value)} />
       </Field>
       <label className="flex items-center gap-2 text-sm text-slate-300">
@@ -752,12 +742,11 @@ function PublishAppModal({
           disabled={tunnel.config_src !== 'cloudflare'}
           onChange={(e) => setManageDns(e.target.checked)}
         />
-        Create the DNS CNAME automatically
+        {t('app_modal.dns_auto')}
       </label>
       {tunnel.config_src !== 'cloudflare' && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-          This tunnel has no remote configuration. The app is saved and written into config.yml, but you must create the
-          DNS record yourself.
+          {t('app_modal.dns_manual_warning')}
         </div>
       )}
     </Modal>

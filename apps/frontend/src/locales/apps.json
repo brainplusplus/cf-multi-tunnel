@@ -1,0 +1,49 @@
+{
+  "title": { "id": "Aplikasi publik", "en": "Published apps" },
+  "description": {
+    "id": "Semua hostname di seluruh tunnel Anda, beserta status sinkronisasi Cloudflare-nya.",
+    "en": "Every hostname across your tunnels, with its Cloudflare sync state."
+  },
+  "sync_cloudflare": { "id": "Sinkron dari Cloudflare", "en": "Sync from Cloudflare" },
+  "sync_done_none": {
+    "id": "Cloudflare tidak punya hostname baru untuk akun-akun ini.",
+    "en": "Cloudflare has no new hostnames for these accounts."
+  },
+  "sync_done": {
+    "id": "Mengimpor {{created}} hostname baru, memperbarui {{updated}}.",
+    "en": "Imported {{created}} new hostname(s), refreshed {{updated}}."
+  },
+  "sync_no_account": {
+    "id": "Belum ada akun dengan token API, jadi tidak ada yang bisa diimpor.",
+    "en": "No account with an API token yet, so there is nothing to import."
+  },
+  "columns": {
+    "hostname": { "id": "Hostname", "en": "Hostname" },
+    "service": { "id": "Layanan", "en": "Service" },
+    "kind": { "id": "Jenis", "en": "Kind" },
+    "tunnel": { "id": "Tunnel", "en": "Tunnel" },
+    "sync": { "id": "Sinkron", "en": "Sync" },
+    "enabled": { "id": "Aktif", "en": "Enabled" }
+  },
+  "kind": {
+    "app": { "id": "aplikasi", "en": "app" },
+    "panel": { "id": "panel", "en": "panel" }
+  },
+  "in_settings": { "id": "di Pengaturan", "en": "in Settings" },
+  "retry": { "id": "Coba lagi", "en": "Retry" },
+  "synced": { "id": "Tersinkron", "en": "Synced" },
+  "empty": { "id": "Belum ada aplikasi publik", "en": "No published apps" },
+  "empty_hint": {
+    "id": "Buka sebuah tunnel lalu tambahkan hostname, atau sinkronkan dari Cloudflare untuk mengimpor hostname yang sudah ada di sana.",
+    "en": "Open a tunnel and add a hostname to publish it, or sync from Cloudflare to import the hostnames that are already configured there."
+  },
+  "filter": {
+    "hostname": { "id": "Hostname", "en": "Hostname" },
+    "service": { "id": "Layanan", "en": "Service" },
+    "kind": { "id": "Jenis", "en": "Kind" },
+    "sync": { "id": "Status sinkron", "en": "Sync status" },
+    "enabled": { "id": "Aktif", "en": "Enabled" },
+    "enabled_yes": { "id": "aktif", "en": "enabled" },
+    "enabled_no": { "id": "nonaktif", "en": "disabled" }
+  }
+}
