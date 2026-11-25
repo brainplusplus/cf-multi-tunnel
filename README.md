@@ -81,14 +81,29 @@ memutar balik ke hostname publik atau `PUBLIC_URL`.
 
 ## Permission token Cloudflare
 
-Buat token di Cloudflare Dashboard → My Profile → API Tokens → Create Token:
+Buat token di Cloudflare Dashboard → My Profile → API Tokens → **Create Token** →
+**Create Custom Token** (preset tidak punya akses tunnel):
 
-| Scope | Permission |
-|---|---|
-| Account | Cloudflare Tunnel · Edit |
-| Account | Account Settings · Read |
-| Zone | Zone · Read |
-| Zone | DNS · Edit |
+1. Token name: bebas, mis. `cf-tunnel-panel`
+2. Permissions — tiap baris tiga dropdown (group, resource, level):
+
+| Scope | Permission | Dipakai untuk |
+|---|---|---|
+| Account | Cloudflare Tunnel · Edit | list/read/tulis ingress tunnel |
+| Account | Account Settings · Read | verifikasi token & nama akun |
+| Zone | Zone · Read | cari zone pemilik hostname |
+| Zone | DNS · Edit | buat/ubah CNAME ke tunnel |
+
+3. Account Resources: Include → akun pemilik tunnel
+4. Zone Resources: Include → All zones from that account (atau zone tertentu)
+5. Continue to summary → Create Token → copy (hanya ditampilkan sekali)
+
+Account ID opsional — panel membacanya dari token. Isi hanya kalau satu token bisa
+melihat beberapa akun; nilainya ada di URL dashboard
+(`dash.cloudflare.com/<account-id>`) atau sidebar Overview sebuah domain.
+
+Panduan langkah demi langkah yang sama juga tersedia langsung di dalam modal
+**Accounts → Add API token**, lengkap dengan link ke halaman token Cloudflare.
 
 Token disimpan terenkripsi AES-256-GCM dan tidak pernah dikembalikan lewat API
 (hanya `token_hint`). Kunci enkripsi ada di volume data; kalau kunci hilang, semua
