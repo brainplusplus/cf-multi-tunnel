@@ -604,9 +604,10 @@ function PublishAppModal({
     setFields({});
     if (app) {
       // Split the stored hostname on the longest matching zone so the two
-      // fields show what was saved rather than an empty form.
-      const zone = [...zones].sort((a, b) => b.name.length - a.name.length).find((z) => app.hostname.endsWith('.' + z.name));
-      setSubdomain(zone ? app.hostname.slice(0, -(zone.name.length + 1)) : app.hostname);
+      // fields show what was saved rather than an empty form. A hostname equal
+      // to the zone itself is the apex, which has no subdomain.
+      const zone = [...zones].sort((a, b) => b.name.length - a.name.length).find((z) => app.hostname === z.name || app.hostname.endsWith('.' + z.name));
+      setSubdomain(zone && app.hostname !== zone.name ? app.hostname.slice(0, -(zone.name.length + 1)) : '');
       setDomain(zone ? zone.name : app.zone_name || '');
       setServiceUrl(app.service_url);
       setPath(app.path);
@@ -666,7 +667,7 @@ function PublishAppModal({
           <button className="btn-ghost" onClick={onClose}>
             {tc('cancel')}
           </button>
-          <button className="btn-primary" disabled={busy || !subdomain || !domain} onClick={() => void submit()}>
+          <button className="btn-primary" disabled={busy || !domain} onClick={() => void submit()}>
             {busy && <Spinner className="h-4 w-4" />} {app ? t('app_modal.save') : t('app_modal.submit')}
           </button>
         </>
@@ -674,7 +675,7 @@ function PublishAppModal({
     >
       {error && <ErrorBox message={error} />}
       <div className="grid grid-cols-[1fr_1.4fr] gap-3">
-        <Field label={t('app_modal.subdomain')} error={fields.hostname}>
+        <Field label={t('app_modal.subdomain')} hint={t('app_modal.subdomain_hint')} error={fields.hostname}>
           <input className="field" value={subdomain} onChange={(e) => setSubdomain(e.target.value)} placeholder="app" />
         </Field>
         <Field label={t('app_modal.domain')} hint={zones.length === 0 ? t('app_modal.no_zone') : undefined}>

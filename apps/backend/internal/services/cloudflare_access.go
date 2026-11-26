@@ -57,12 +57,42 @@ func MapUpstream(err error) *AppError {
 	}
 	if cloudflare.IsPermission(err) {
 		return NewError(422, "cf_permission_denied",
-			"Cloudflare rejected the request: the API token is missing a required permission (Account: Cloudflare Tunnel Edit, Zone: DNS Edit, Zone: Zone Read)")
+			"Cloudflare denied this request. The token needs Account → Cloudflare Tunnel: Edit, and Zone → Zone: Read + DNS: Edit, scoped to this account and zone")
 	}
 	if cloudflare.IsNotFound(err) {
 		return NewError(404, "cf_not_found", "the resource no longer exists on Cloudflare")
 	}
 	return Upstream(err)
+}
+
+// AccountUpstream names what the panel was doing and which account failed.
+// MapUpstream's permission message is intentionally generic ("the token needs
+// ..."), so without this an operator staring at four account rows has no way to
+// tell which token is short a permission. The Cloudflare code/message is
+// appended because 10000 (authentication) and 9109 (unauthorized resource) mean
+// different fixes: wrong account scope vs. missing permission group.
+func AccountUpstream(action string, account *models.CFAccount, err error) *AppError {
+	appErr := MapUpstream(err)
+	var apiErr *cloudflare.APIError
+	if errors.As(err, &apiErr) && len(apiErr.Errors) > 0 {
+		// 10000 on a tunnel write means the token can see the account (zones
+		// list fine) but its Account policy does not Include that Cloudflare
+		// account. That is a different fix from a plain missing scope, so it
+		// gets its own sentence instead of a cryptic "Authentication error".
+		if apiErr.Errors[0].Code == 10000 {
+			appErr.Message = fmt.Sprintf(
+				"%s for %s: Cloudflare rejected the token for this account (10000 Authentication error). "+
+					"The token can read this account's zones but its Account policy does not include it — "+
+					"add the account to the token's Account → Include list with Cloudflare Tunnel: Edit, or attach a token created for that account",
+				action, account.Name)
+			return appErr
+		}
+		appErr.Message = fmt.Sprintf("%s for %s: %s (Cloudflare %d: %s)",
+			action, account.Name, appErr.Message, apiErr.Errors[0].Code, apiErr.Errors[0].Message)
+	} else {
+		appErr.Message = fmt.Sprintf("%s for %s: %s", action, account.Name, appErr.Message)
+	}
+	return appErr
 }
 
 // ── Validation helpers ───────────────────────────────────────────────

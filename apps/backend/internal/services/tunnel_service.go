@@ -137,14 +137,14 @@ func (s *TunnelService) Create(ctx context.Context, caller Caller, in CreateTunn
 
 	remote, err := client.CreateTunnel(ctx, account.AccountID, name, "cloudflare")
 	if err != nil {
-		return nil, MapUpstream(err)
+		return nil, AccountUpstream("create a tunnel", account, err)
 	}
 
 	token, err := client.GetTunnelToken(ctx, account.AccountID, remote.ID)
 	if err != nil {
 		// The tunnel exists remotely; clean up so a retry does not hit a name clash.
 		_ = client.DeleteTunnel(ctx, account.AccountID, remote.ID)
-		return nil, MapUpstream(err)
+		return nil, AccountUpstream("read the tunnel token", account, err)
 	}
 	encToken, err := s.cf.Encrypt(token)
 	if err != nil {

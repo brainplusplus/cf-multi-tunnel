@@ -578,8 +578,14 @@ func (s *AppService) RemovePanelExposure(ctx context.Context, caller Caller) err
 
 func resolveHostname(in CreateAppInput) (string, error) {
 	raw := strings.TrimSpace(in.Hostname)
-	if raw == "" && in.Subdomain != "" && in.Domain != "" {
-		raw = in.Subdomain + "." + in.Domain
+	if raw == "" && in.Domain != "" {
+		// An empty subdomain means the apex itself: the operator wants the bare
+		// domain, e.g. example.com rather than app.example.com.
+		if sub := strings.TrimSpace(in.Subdomain); sub != "" {
+			raw = sub + "." + in.Domain
+		} else {
+			raw = in.Domain
+		}
 	}
 	hostname, err := NormalizeHostname(raw)
 	if err != nil {

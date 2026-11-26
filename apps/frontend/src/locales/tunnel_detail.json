@@ -120,6 +120,10 @@
     "submit": { "id": "Publikasikan", "en": "Publish" },
     "save": { "id": "Simpan perubahan", "en": "Save changes" },
     "subdomain": { "id": "Subdomain", "en": "Subdomain" },
+    "subdomain_hint": {
+      "id": "Kosongkan untuk memakai domain utama (apex), mis. namadomain.com",
+      "en": "Leave empty to use the apex domain itself, e.g. example.com"
+    },
     "domain": { "id": "Domain", "en": "Domain" },
     "no_zone": {
       "id": "Belum ada zona tersimpan; sinkronkan akun dulu.",

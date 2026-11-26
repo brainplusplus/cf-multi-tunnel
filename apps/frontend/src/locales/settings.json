@@ -26,6 +26,10 @@
       "en": "This exposure uses a tunnel on another device ({{name}}). That only works if the device can reach {{service}}. Move it to a tunnel on this server if unsure."
     },
     "subdomain": { "id": "Subdomain", "en": "Subdomain" },
+    "subdomain_hint": {
+      "id": "Kosongkan untuk memakai domain utama (apex), mis. namadomain.com",
+      "en": "Leave empty to use the apex domain itself, e.g. example.com"
+    },
     "domain": { "id": "Domain", "en": "Domain" },
     "service_url": { "id": "Service URL", "en": "Service URL" },
     "service_auto": {

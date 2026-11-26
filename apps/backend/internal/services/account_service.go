@@ -526,10 +526,33 @@ func (s *AccountService) SyncZones(ctx context.Context, caller Caller, id string
 	return s.zones.ListByAccount(ctx, account.ID)
 }
 
+// zoneCacheTTL bounds how long the cached zone directory may go stale. The
+// publish-app dropdown reads this list, so a zone created in Cloudflare after
+// the last explicit Sync must still show up without the operator thinking to
+// press Sync first.
+const zoneCacheTTL = 10 * time.Minute
+
+// ListZones returns the cached zone directory for an account, refreshing it
+// best-effort when the cache is empty or older than zoneCacheTTL. A failing
+// refresh keeps serving the cache: a stale dropdown beats a broken page.
 func (s *AccountService) ListZones(ctx context.Context, caller Caller, id string) ([]models.CFZone, error) {
 	account, err := s.Get(ctx, caller, id)
 	if err != nil {
 		return nil, err
+	}
+	zones, err := s.zones.ListByAccount(ctx, account.ID)
+	if err != nil {
+		return nil, err
+	}
+	if len(zones) > 0 && time.Since(zones[0].SyncedAt) < zoneCacheTTL {
+		return zones, nil
+	}
+	client, err := s.cf.ClientFor(account)
+	if err != nil {
+		return zones, nil
+	}
+	if err := s.syncZones(ctx, account, client); err != nil {
+		return zones, nil
 	}
 	return s.zones.ListByAccount(ctx, account.ID)
 }

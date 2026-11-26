@@ -224,7 +224,7 @@ function PanelExposureCard() {
       <p className="mt-1.5 text-[11px] text-slate-500">{t('exposure.tunnel_hint')}</p>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1.4fr]">
-        <Field label={t('exposure.subdomain')}>
+        <Field label={t('exposure.subdomain')} hint={t('exposure.subdomain_hint')}>
           <input
             className="field"
             value={subdomain}
@@ -263,11 +263,11 @@ function PanelExposureCard() {
         </Field>
       </div>
 
-      {subdomain && domain && (
+      {domain && (
         <p className="mt-3 text-xs text-slate-500">
           {t('exposure.will_publish')}{' '}
           <span className="font-mono text-slate-300">
-            {subdomain.trim()}.{domain}
+            {subdomain.trim() ? `${subdomain.trim()}.${domain}` : domain}
           </span>{' '}
           → <span className="font-mono text-slate-400">{effectiveServiceUrl}</span>
         </p>
@@ -276,7 +276,7 @@ function PanelExposureCard() {
       <div className="mt-3 flex items-center justify-end gap-3">
         <button
           className="btn-primary"
-          disabled={busy || !tunnelId || !subdomain.trim() || !domain}
+          disabled={busy || !tunnelId || !domain}
           onClick={() => void save()}
         >
           {busy && <Spinner className="h-4 w-4" />} {exposure ? t('exposure.update') : t('exposure.publish')}
