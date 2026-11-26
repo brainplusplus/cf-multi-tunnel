@@ -26,7 +26,9 @@ func main() {
 		}
 	}
 
-	port := getEnv("PORT", getEnv("PROXY_PORT", "7777"))
+	// PROXY_PORT wins over PORT so a native run can share one .env with the
+	// backend (PORT=3001) without the two processes fighting over the same port.
+	port := getEnv("PROXY_PORT", getEnv("PORT", "7777"))
 	backendURL := getEnv("BACKEND_URL", "http://localhost:3001")
 	staticDir := getEnv("STATIC_DIR", "../frontend/dist")
 

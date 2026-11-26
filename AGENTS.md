@@ -9,7 +9,9 @@ the invariants that are easy to break and the commands that actually verify a ch
 apps/backend        Go 1.26 + Echo + GORM + SQLite (module cf-multi-tunnel/backend)
 apps/reverse-proxy  Go SPA + /api reverse proxy (module cf-multi-tunnel/reverse-proxy)
 apps/frontend       React 19 + Vite 6 + Tailwind 4 (bun)
-scripts             backup.ps1 / backup.sh (sqlite3 .backup, WAL-safe)
+scripts             build.mjs / run.mjs (cross-OS), install.sh / install.ps1 (one-line
+                    installer), backup.ps1 / backup.sh (sqlite3 .backup, WAL-safe)
+.github/workflows   release.yml (tag v* → binaries + multi-arch ghcr images + release)
 docker-compose.yml  backend + reverse-proxy, network cfmt-panel, volume cfmt-data
 ```
 
@@ -26,10 +28,20 @@ cd apps/backend && gofmt -w ./internal ./main.go && go build ./... && go vet ./.
 # frontend (tsc is strict: noUnusedLocals, noUnusedParameters)
 cd apps/frontend && bun run build
 
+# cross-OS build/run (adds .exe only on Windows; output in apps/bin)
+bun run build            # = bun scripts/build.mjs all
+bun run prod
+
 # stack
 docker compose up -d --build
 docker compose logs -f backend
+
+# syntax check the installers without running them
+bash -n scripts/install.sh
 ```
+
+Cross-compiling is a real check here, not a formality — the backend is CGO-free
+(`glebarez/sqlite`), so `GOOS=windows|darwin go build ./...` must stay green.
 
 Tests exist only in `internal/services` and use `httptest` as a fake Cloudflare API
 (`account_reconcile_test.go`) plus a temp SQLite file. No network or token needed.
@@ -175,7 +187,11 @@ only exception because it shows one tunnel's handful of routes.
 **DNS records are live, and a tunnel-owned CNAME is locked.**
 `services/dns_service.go` reads every record straight from Cloudflare on each
 request (`cloudflare.ListAllDNSRecords`); only the zone list is cached, as the
-directory of what can be opened. Do not add a local DNS record cache — a stale
+directory of what can be opened. That cache must not go stale silently:
+`AccountService.ListZones` refreshes it best-effort when it is empty or older
+than `zoneCacheTTL` (10 min), because the publish-app DOMAIN dropdown reads it
+and a zone created after the last Sync used to stay invisible until someone
+pressed Sync (`zone_cache_test.go`). Do not add a local DNS record cache — a stale
 row the operator deletes is a silent outage. A row is **managed** when a
 `published_app` owns that record id, or when its CNAME target ends in
 `.cfargotunnel.com` and the hostname is published on that zone; managed rows are
@@ -199,6 +215,10 @@ owner is `_service._proto`, CAA uses `data.flags/tag/value`. A relative name
 - Tailwind 4: component classes in `src/index.css` must repeat utilities; `@apply btn`
   fails with "unknown utility class".
 - `lucide-react` here has no `Docker` icon — use `Container`.
+- The publish form's subdomain is optional: an empty subdomain means the apex
+  domain (`resolveHostname` in `app_service.go`). Cloudflare accepts a CNAME at
+  the apex only because it flattens it, so the apex must not already carry A/AAAA
+  records (Cloudflare answers 81053) — remove those or uncheck automatic DNS.
 - Cloudflare cannot edit tunnels with `config_src=local|unknown` via API. Show a
   `config.yml` example instead of pretending the write succeeded.
 - Panel exposure is local-tunnel-only; the Settings dropdown filters
@@ -207,11 +227,26 @@ owner is `_service._proto`, CAA uses `data.flags/tag/value`. A relative name
   tunnel stays visible with a warning.
 - Connector image is resolved at runtime: `settings` key `connector.image` overrides
   `CLOUDFLARED_IMAGE`.
-- Dev ports: backend 3001, Vite 3002 (proxies `/api`), reverse proxy 7777 (reads `PORT`
-  first, then `PROXY_PORT`).
+- Dev ports: backend 3001, Vite 3002 (proxies `/api`), reverse proxy 7777 (reads
+  `PROXY_PORT` first, then `PORT` — a native run shares one `.env` with the
+  backend, so `PORT=3001` must not make the proxy bind the backend's port).
 - Docker builds: root `.dockerignore` keeps `node_modules` (120 MB) and `.env` out of
   the build context for `Dockerfile.proxy` (context is the repo root).
 - The backend container runs as root because it needs `/var/run/docker.sock`.
+- **The compose socket path is a variable.** `docker-compose.yml` mounts
+  `${DOCKER_SOCKET:-/var/run/docker.sock}`; do not hard-code it again. `image:` sits
+  next to `build:` on purpose — `compose pull` gets the published ghcr image and
+  `--build` still works offline with the same tag name.
+- **No path may assume Linux.** Config uses `filepath.Join` and `DATA_DIR` defaults to
+  `./data`; `scripts/build.mjs` adds `.exe` only on `win32`. If you add a new file
+  operation, keep it `filepath`-based so `GOOS=windows|darwin go build ./...` stays
+  green.
+- **The installers are shipped as-is by `curl | bash` / `irm | iex`.** `install.sh`
+  must stay POSIX-bash-only with no repo-relative paths (it runs from a pipe, so
+  `$0` is not the script path), must not overwrite an existing `.env` or `data/`,
+  and must fall back `docker → native` when Docker is unavailable. Release assets
+  are named `cfmt-<os>-<arch>.tar.gz` (`.zip` on Windows) with `bin/` + `static/`
+  inside — renaming them breaks both installers.
 
 ## Deploy checklist
 

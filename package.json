@@ -6,12 +6,12 @@
     "dev:backend": "cd apps/backend && go run .",
     "dev:proxy": "cd apps/reverse-proxy && go run .",
     "dev": "concurrently --kill-others \"bun run dev:backend\" \"bun run dev:frontend\" \"bun run dev:proxy\"",
-    "build:frontend": "cd apps/frontend && bun run build",
-    "build:backend": "cd apps/backend && go build -o ../bin/backend.exe .",
-    "build:proxy": "cd apps/reverse-proxy && go build -o ../bin/reverse-proxy.exe .",
-    "build": "bun run build:frontend && bun run build:backend && bun run build:proxy",
-    "prod:backend": "cd apps/bin && backend.exe",
-    "prod:proxy": "cd apps/bin && reverse-proxy.exe",
+    "build:frontend": "bun scripts/build.mjs frontend",
+    "build:backend": "bun scripts/build.mjs backend",
+    "build:proxy": "bun scripts/build.mjs proxy",
+    "build": "bun scripts/build.mjs all",
+    "prod:backend": "bun scripts/run.mjs backend",
+    "prod:proxy": "bun scripts/run.mjs reverse-proxy",
     "prod": "concurrently --kill-others \"bun run prod:backend\" \"bun run prod:proxy\""
   },
   "devDependencies": {

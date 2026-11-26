@@ -2,6 +2,10 @@ name: cf-multi-tunnel
 
 services:
   backend:
+    # Published by .github/workflows/release.yml for linux/amd64 + linux/arm64.
+    # Keeping `build` next to it means `docker compose up -d --build` still works
+    # offline and tags the result with the same name.
+    image: ${CFMT_BACKEND_IMAGE:-ghcr.io/brainplusplus/cf-multi-tunnel-backend:latest}
     build:
       context: ./apps/backend
     restart: unless-stopped
@@ -12,8 +16,9 @@ services:
       # volume; only `down -v` deletes it. It contains app.db (+ WAL),
       # .jwt_secret and encryption.key — losing it loses every CF credential.
       - cfmt_data:/app/data
-      # Required to spawn one cloudflared container per tunnel.
-      - /var/run/docker.sock:/var/run/docker.sock
+      # Required to spawn one cloudflared container per tunnel. Override the
+      # host path on Docker Desktop / Podman with DOCKER_SOCKET.
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
     environment:
       - APP_NAME=${APP_NAME:-CF Tunnel Panel}
       - PORT=3001
@@ -47,6 +52,7 @@ services:
       start_period: 10s
 
   reverse-proxy:
+    image: ${CFMT_PROXY_IMAGE:-ghcr.io/brainplusplus/cf-multi-tunnel-reverse-proxy:latest}
     build:
       context: .
       dockerfile: Dockerfile.proxy
@@ -55,7 +61,9 @@ services:
       - '${PANEL_PORT:-7777}:7777'
     environment:
       - PORT=7777
-      - BACKEND_URL=http://backend:3001
+      # Docker Desktop resolves this to the host as well, so the panel works the
+      # same on Linux, macOS and Windows. Override for a split deployment.
+      - BACKEND_URL=${BACKEND_URL:-http://backend:3001}
       - STATIC_DIR=/app/static
     depends_on:
       - backend

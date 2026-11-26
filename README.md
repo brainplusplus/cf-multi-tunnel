@@ -6,16 +6,52 @@ berjalan **di perangkat lain**.
 
 - Backend: Go + Echo + GORM + SQLite
 - Frontend: React 19 + Vite + Tailwind 4 (dilayani oleh reverse proxy Go yang sama)
-- Deploy: satu `docker compose up -d --build`
+- Deploy: Docker Compose, atau binary native Linux/macOS/Windows
+
+## Instalasi satu baris
+
+Linux / macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/brainplusplus/cf-multi-tunnel/main/scripts/install.sh | bash
+# dengan opsi
+curl -fsSL https://raw.githubusercontent.com/brainplusplus/cf-multi-tunnel/main/scripts/install.sh \
+  | bash -s -- --port 8080 --email admin@contoh.id --password rahasia123
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/brainplusplus/cf-multi-tunnel/main/scripts/install.ps1 | iex
+# dengan opsi
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/brainplusplus/cf-multi-tunnel/main/scripts/install.ps1))) -Port 8080 -Mode native
+```
+
+Installer memilih mode sendiri:
+
+| Mode | Kapan dipakai | Yang dipasang |
+|---|---|---|
+| `docker` | Docker (Desktop) berjalan — default | project compose + image `ghcr.io/brainplusplus/...`; kalau registry tidak terjangkau, build lokal |
+| `native` | Docker tidak ada / tidak jalan | binary rilis (`bin/backend`, `bin/reverse-proxy`) + `static/`, dijalankan systemd (Linux), launchd (macOS), atau Scheduled Task (Windows) |
+
+Keduanya **idempoten**: `.env` dan folder `data/` yang sudah ada tidak pernah ditimpa,
+jadi menjalankan ulang installer = upgrade kode tanpa kehilangan kredensial.
+
+Opsi `install.sh`: `--mode docker|native|auto`, `--dir`, `--port`, `--email`,
+`--password`, `--version` (tag rilis untuk mode native), `--ref` (branch untuk mode
+docker), `--no-start`. Opsi yang sama tersedia sebagai parameter `install.ps1`.
 
 ## Kebutuhan
 
-- Docker + Docker Compose (panel menjalankan satu container `cloudflared` per tunnel lokal,
-  jadi butuh akses ke `docker.sock`)
 - Akun Cloudflare + API token (lihat [Permission token](#permission-token-cloudflare))
 - Domain yang zone-nya ada di akun tersebut
+- **Untuk connector mode `docker`:** Docker + Docker Compose, karena panel menjalankan
+  satu container `cloudflared` per tunnel lokal dan butuh akses ke `docker.sock`
+  (Docker Desktop menyediakannya di `/var/run/docker.sock` di dalam container Linux).
+  Tanpa Docker, pakai `CONNECTOR_MODE=external` — panel tetap mengelola ingress, DNS,
+  dan status, tapi cloudflared Anda jalankan sendiri.
 
-## Quick start
+## Quick start (manual, Docker)
 
 ```bash
 cp .env.example .env
@@ -28,6 +64,30 @@ Buka `http://<host>:7777` (ubah dengan `PANEL_PORT` di `.env`).
 
 Kalau `PUBLIC_URL` bukan `http://localhost:7777`, ubah juga — nilai itu dipakai untuk
 menampilkan alamat panel dan untuk validasi saat panel dipublikasikan lewat tunnel.
+
+## Rilis (untuk maintainer)
+
+Mode `native` mengambil binary dari GitHub Release, dan compose memakai image
+`ghcr.io/<owner>/cf-multi-tunnel-*`. Keduanya dibuat otomatis saat tag di-push:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+`.github/workflows/release.yml` lalu:
+
+1. build frontend + cross-compile backend & reverse proxy untuk
+   `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64`, `windows/amd64`;
+2. membungkusnya jadi `cfmt-<os>-<arch>.tar.gz` (`.zip` untuk Windows) berisi
+   `bin/` + `static/`, lalu melampirkannya ke Release;
+3. build & push image `ghcr.io/<owner>/cf-multi-tunnel-backend` dan
+   `-reverse-proxy` untuk `linux/amd64` + `linux/arm64`, tag `latest` + versi.
+
+Catatan: package GHCR baru bersifat **private** secara default. Supaya `compose pull`
+bisa dipakai orang lain, buka *Package settings → Change visibility → Public*.
+Selama masih private, installer otomatis jatuh ke `docker compose up -d --build`.
+Ganti image dengan `CFMT_BACKEND_IMAGE` / `CFMT_PROXY_IMAGE` bila memakai fork.
 
 ## Login pertama
 
@@ -292,6 +352,17 @@ Hanya tunnel dengan `config_src=cloudflare` yang bisa diubah lewat API. Kalau
 `config_src` adalah `local`, konfigurasi dikelola dari file `config.yml` di perangkat
 tersebut; panel hanya bisa menampilkan file contohnya.
 
+**"Cloudflare rejected the token for this account (10000 Authentication error)"**
+Token yang tersimpan di baris akun itu tidak mencantumkan akun tersebut di
+**Account → Include**. Ini sering terjadi kalau satu token dipakai untuk beberapa akun:
+policy **Zone** bisa mencakup zone akun itu (daftar domain dan DNS jalan), sementara
+policy **Account** hanya menyebut sebagian akun, sehingga membuat tunnel ditolak.
+Perbaiki di Cloudflare → API Tokens → token tersebut → policy Account →
+`Include → Specific account` → tambahkan akun itu (centang **Cloudflare Tunnel: Edit**
+dan **Account Settings: Read**), atau buat token khusus akun itu lalu tempel lewat
+**Akun → Attach token**. Token yang sama boleh dipakai di beberapa baris akun selama
+semua akun itu ada di Include.
+
 **Hostname sudah dipakai**
 Satu hostname hanya boleh dimiliki satu app. Saat sync, hostname milik tunnel lain
 dilewati dan dilaporkan, tidak direbut.
@@ -300,12 +371,51 @@ dilewati dan dilaporkan, tidak direbut.
 Hampir pasti volume terhapus (`down -v`) atau `DB_PATH`/`DATA_DIR` diarahkan ke luar
 `/app/data`. Cek `docker compose exec backend ls -la /app/data`.
 
+## Dukungan sistem operasi
+
+| Komponen | Linux | macOS | Windows |
+|---|---|---|---|
+| Backend & reverse proxy | ✅ amd64/arm64 | ✅ amd64/arm64 | ✅ amd64 |
+| SQLite (`glebarez/sqlite`, pure Go) | ✅ | ✅ | ✅ tanpa CGO/compiler |
+| Frontend | ✅ (browser) | ✅ | ✅ |
+| Mode `docker` | ✅ native | ✅ Docker Desktop | ✅ Docker Desktop / WSL |
+| Mode `native` + autostart | systemd | launchd | Scheduled Task (at logon) |
+| Backup | `scripts/backup.sh` | `scripts/backup.sh` | `scripts/backup.ps1` |
+
+Image yang dipublikasikan (`ghcr.io/brainplusplus/cf-multi-tunnel-*`) bersifat
+**multi-arch** untuk `linux/amd64` + `linux/arm64`, jadi Raspberry Pi dan Apple Silicon
+tidak perlu build sendiri. Di Windows/macOS image itu berjalan lewat Docker Desktop.
+
+### Menjalankan native (tanpa Docker)
+
+```bash
+bun run build                  # hasilnya di apps/bin/ (backend.exe di Windows)
+bun run prod                   # jalankan backend + reverse proxy
+```
+
+Atau lewat installer: `install.sh --mode native` / `install.ps1 -Mode native`, yang
+menaruh binary di `bin/`, frontend di `static/`, lalu membuat service autostart.
+
+Catatan native:
+
+- `CONNECTOR_MODE=docker` hanya efektif kalau CLI `docker` ada di `PATH`; kalau tidak,
+  pakai `external` dan jalankan `cloudflared` sendiri.
+- Port publik diatur `PANEL_PORT`/`PORT` pada reverse proxy (default `7777`); backend
+  tetap di `3001`.
+- Data (`.env`, `data/app.db`, `.jwt_secret`, `encryption.key`) ada di folder instalasi —
+  backup folder itu, bukan hanya DB-nya.
+
 ## Development
 
 ```bash
 bun run dev        # backend :3001, vite :3002, reverse proxy :7777
-bun run build      # frontend + backend + proxy
+bun run build      # frontend + backend + proxy (scripts/build.mjs, cross-platform)
+bun run prod       # jalankan hasil build dari apps/bin
 cd apps/backend && go test ./...
 ```
+
+`scripts/build.mjs` menambahkan suffix `.exe` hanya di Windows, jadi perintah yang sama
+dipakai di Linux, macOS, dan Windows. Rilis multi-platform dibuat oleh
+`.github/workflows/release.yml` saat tag `v*` di-push.
 
 Vite mem-proxy `/api` ke backend, jadi frontend selalu memakai path relatif.

@@ -1,0 +1,180 @@
+name: release
+
+# Tag a commit (git tag v1.2.3 && git push origin v1.2.3) and this publishes
+#   - cfmt-<os>-<arch>.tar.gz / .zip  (native binaries + static bundle)
+#   - ghcr.io/<owner>/cf-multi-tunnel-backend:<tag|latest>   (linux/amd64,arm64)
+#   - ghcr.io/<owner>/cf-multi-tunnel-reverse-proxy:<tag|latest>
+# which is what scripts/install.sh and scripts/install.ps1 download.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v1.0.0). Leave empty to build without publishing a release.'
+        required: false
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  GO_VERSION: '1.26'
+  BUN_VERSION: '1'
+
+jobs:
+  binaries:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: windows
+            arch: amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: |
+            apps/backend/go.sum
+            apps/reverse-proxy/go.sum
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Build frontend
+        working-directory: apps/frontend
+        run: |
+          bun install --frozen-lockfile || bun install
+          bun run build
+
+      - name: Build binaries
+        shell: bash
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: '0'
+        run: |
+          set -eu
+          suffix=""
+          if [ "$GOOS" = "windows" ]; then suffix=".exe"; fi
+          mkdir -p stage/bin stage/static
+          (cd apps/backend && go build -trimpath -ldflags="-s -w" -o "../../stage/bin/backend$suffix" .)
+          (cd apps/reverse-proxy && go build -trimpath -ldflags="-s -w" -o "../../stage/bin/reverse-proxy$suffix" .)
+          cp -r apps/frontend/dist/. stage/static/
+
+      - name: Package archive
+        shell: bash
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          set -eu
+          name="cfmt-${GOOS}-${GOARCH}"
+          mkdir -p out
+          if [ "$GOOS" = "windows" ]; then
+            (cd stage && zip -qr "../out/${name}.zip" .)
+          else
+            tar -czf "out/${name}.tar.gz" -C stage .
+          fi
+          ls -lh out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cfmt-${{ matrix.os }}-${{ matrix.arch }}
+          path: out/*
+          if-no-files-found: error
+
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: ./apps/backend
+            dockerfile: ./apps/backend/Dockerfile
+          - name: reverse-proxy
+            context: .
+            dockerfile: ./Dockerfile.proxy
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-${{ matrix.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=sha,format=short
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  release:
+    needs: binaries
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            Linux / macOS (Docker if available, otherwise native binaries):
+
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/scripts/install.sh | bash
+            ```
+
+            Windows (PowerShell):
+
+            ```powershell
+            irm https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/scripts/install.ps1 | iex
+            ```
+
+            Prebuilt images:
+
+            ```
+            ghcr.io/${{ github.repository }}-backend:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}-reverse-proxy:${{ github.ref_name }}
+            ```
